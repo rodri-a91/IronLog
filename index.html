@@ -707,6 +707,104 @@ function RecTab({sessions}){
   );
 }
 
+// ---- Backup Tab ----
+function BackupTab({sessions,library,profile,onRestore}){
+  const [importError,setImportError]=useState('');
+  const [importOk,setImportOk]=useState(false);
+  const fileRef=useRef();
+
+  const dataSize=useMemo(()=>{
+    const raw=JSON.stringify({sessions,library,profile});
+    return (new Blob([raw]).size/1024).toFixed(1);
+  },[sessions,library,profile]);
+
+  function exportData(){
+    const payload={
+      version:1,
+      exportedAt:new Date().toISOString(),
+      sessions,library,profile
+    };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    const dateStr=new Date().toISOString().slice(0,10);
+    a.download='ironlog-backup-'+dateStr+'.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleFileChange(e){
+    setImportError('');setImportOk(false);
+    const file=e.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(!data.sessions||!Array.isArray(data.sessions))throw new Error('Formato inválido: falta la lista de sesiones.');
+        if(!data.library||!Array.isArray(data.library))throw new Error('Formato inválido: falta la biblioteca.');
+        const confirm=window.confirm(
+          `Se van a importar:\n• ${data.sessions.length} sesiones\n• ${data.library.length} ejercicios\n\nEsto reemplazará todos los datos actuales. ¿Continuar?`
+        );
+        if(!confirm){e.target.value='';return;}
+        onRestore(data);
+        setImportOk(true);
+      }catch(err){
+        setImportError('Error al leer el archivo: '+err.message);
+      }
+      e.target.value='';
+    };
+    reader.readAsText(file);
+  }
+
+  return h('div',{className:'content'},
+    h('div',{className:'ptitle'},'COPIA DE SEGURIDAD'),
+    h('div',{className:'psub'},'Exporta e importa todos tus datos'),
+
+    h('div',{className:'card'},
+      h('div',{className:'cardtitle'},'Exportar'),
+      h('p',{style:{fontSize:13,color:'var(--t2)',lineHeight:1.6,marginBottom:16}},
+        'Descarga un archivo JSON con todas tus sesiones, ejercicios y perfil. Guárdalo en iCloud, Google Drive o donde prefieras. Puedes importarlo en cualquier momento para restaurar todo.'
+      ),
+      h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'var(--bg2)',borderRadius:10,marginBottom:14}},
+        h('div',null,
+          h('div',{style:{fontSize:13,fontWeight:600,color:'var(--t1)'}},sessions.length+' sesiones · '+library.length+' ejercicios'),
+          h('div',{style:{fontSize:11,color:'var(--t2)',marginTop:2}},'Tamaño estimado: '+dataSize+' KB')
+        ),
+        h('div',{style:{fontSize:24}},'📦')
+      ),
+      h('button',{className:'btn btnp',style:{width:'100%'},onClick:exportData},
+        '⬇ Descargar copia de seguridad'
+      )
+    ),
+
+    h('div',{className:'card'},
+      h('div',{className:'cardtitle'},'Importar'),
+      h('p',{style:{fontSize:13,color:'var(--t2)',lineHeight:1.6,marginBottom:16}},
+        'Selecciona un archivo de copia de seguridad generado por IronLog para restaurar tus datos. ',
+        h('strong',{style:{color:'var(--accent)'}},'Atención: esto reemplazará todos los datos actuales.')
+      ),
+      h('input',{ref:fileRef,type:'file',accept:'.json,application/json',style:{display:'none'},onChange:handleFileChange}),
+      h('button',{className:'btn btns',style:{width:'100%'},onClick:()=>fileRef.current.click()},
+        '⬆ Seleccionar archivo de copia'
+      ),
+      importError&&h('div',{style:{marginTop:10,padding:'10px 14px',background:'#FCEBEB',borderRadius:8,fontSize:13,color:'#A32D2D',fontWeight:500}},importError),
+      importOk&&h('div',{style:{marginTop:10,padding:'10px 14px',background:'#EAF3DE',borderRadius:8,fontSize:13,color:'#3B6D11',fontWeight:500}},'✅ Datos importados correctamente.')
+    ),
+
+    h('div',{className:'card'},
+      h('div',{className:'cardtitle'},'Cómo guardar la copia en el iPhone'),
+      h('p',{style:{fontSize:13,color:'var(--t2)',lineHeight:1.7}},
+        '1. Pulsa "Descargar copia de seguridad".',h('br',null),
+        '2. Safari te preguntará dónde guardarlo — elige ',h('strong',{style:{color:'var(--t1)'}},'iCloud Drive'),
+        ' o ',h('strong',{style:{color:'var(--t1)'}},'En mi iPhone'),'.',h('br',null),
+        '3. Para restaurar, abre IronLog, ven aquí e importa ese archivo desde la app Archivos.'
+      )
+    )
+  );
+}
+
 // ---- App Root ----
 function App(){
   const [tab,setTab]=useState('workout');
@@ -721,6 +819,11 @@ function App(){
   function addSession(s){setSessions(prev=>[s,...prev]);}
   function addToLibrary(ex){setLibrary(prev=>[...prev,ex]);}
   function removeFromLibrary(id){setLibrary(prev=>prev.filter(e=>e.id!==id));}
+  function restoreBackup(data){
+    setSessions(data.sessions);
+    setLibrary(data.library);
+    if(data.profile)setProfile(data.profile);
+  }
 
   const TABS=[
     {id:'workout',label:'Hoy',Icon:Icons.workout},
@@ -728,6 +831,7 @@ function App(){
     {id:'history',label:'Historial',Icon:Icons.history},
     {id:'stats',label:'Stats',Icon:Icons.stats},
     {id:'rec',label:'Consejos',Icon:Icons.rec},
+    {id:'backup',label:'Backup',Icon:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4'}),h('polyline',{points:'7 10 12 15 17 10'}),h('line',{x1:'12',y1:'15',x2:'12',y2:'3'}))},
   ];
 
   return h('div',{className:'app'},
@@ -744,7 +848,8 @@ function App(){
     tab==='library'&&h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary}),
     tab==='history'&&h(HistoryTab,{sessions}),
     tab==='stats'&&h(StatsTab,{sessions}),
-    tab==='rec'&&h(RecTab,{sessions})
+    tab==='rec'&&h(RecTab,{sessions}),
+    tab==='backup'&&h(BackupTab,{sessions,library,profile,onRestore:restoreBackup})
   );
 }
 
