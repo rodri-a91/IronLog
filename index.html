@@ -253,6 +253,26 @@ body{
 .profile-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-radius:10px;margin-bottom:12px;font-size:13px;color:var(--t2)}
 .method-note{font-size:11px;color:var(--t2);background:var(--bg2);border-radius:8px;padding:9px 12px;margin-top:8px;line-height:1.55}
 
+/* Profile tab */
+.profile-hero{position:relative;display:flex;align-items:center;gap:16px;padding:20px;background:var(--card);border:0.5px solid var(--border);border-radius:16px;margin-bottom:12px;overflow:hidden}
+.profile-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);border-radius:16px 16px 0 0}
+.avatar-circle{width:64px;height:64px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;font-weight:800;color:#fff;letter-spacing:1px}
+.profile-hero-info{flex:1}
+.profile-hero-name{font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
+.profile-hero-meta{font-size:13px;color:var(--t2)}
+.profile-hero-edit{position:absolute;top:14px;right:14px}
+
+.weight-log-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:0.5px solid var(--border)}
+.weight-log-row:last-child{border-bottom:none}
+.weight-log-date{font-size:12px;color:var(--t2)}
+.weight-log-val{font-size:18px;font-weight:700;color:var(--t1)}
+.weight-log-val span{font-size:12px;font-weight:400;color:var(--t2)}
+.weight-add-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:4px}
+.weight-add-row input{flex:1;height:42px;border:0.5px solid var(--border2);border-radius:10px;padding:0 12px;font-size:16px;background:var(--bg2);color:var(--t1);font-family:inherit}
+.current-weight-badge{display:inline-flex;align-items:baseline;gap:4px;padding:8px 14px;background:var(--bg2);border-radius:10px;border:0.5px solid var(--border)}
+.current-weight-badge .w-num{font-size:28px;font-weight:800;color:var(--t1)}
+.current-weight-badge .w-unit{font-size:13px;color:var(--t2)}
+
 /* Misc */
 .pbar{height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:6px}
 .pbarf{height:100%;border-radius:3px;background:var(--accent);transition:width .4s}
@@ -485,22 +505,154 @@ function ExerciseBlock({ex,onChange,onRemove,bw}){
   );
 }
 
-// ---- Profile Banner ----
-function ProfileBanner({profile,onChange}){
-  const [editing,setEditing]=useState(!profile.weight);
-  if(!editing)return h('div',{className:'profile-bar'},
-    h('span',null,h('strong',{style:{color:'var(--t1)'}},profile.weight+'kg'),' · '+profile.sex+' · '+profile.age+' años'),
-    h('button',{className:'btn btns btnsm',onClick:()=>setEditing(true)},'Editar perfil')
+// ---- Profile Banner (compact, shown in WorkoutTab) ----
+function ProfileBanner({profile,weightLog,onGoToProfile}){
+  const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
+  if(!currentWeight)return h('div',{className:'profile-bar'},
+    h('span',{style:{color:'var(--accent)',fontWeight:500}},'⚠ Añade tu peso en Perfil para estimar calorías'),
+    h('button',{className:'btn btns btnsm',onClick:onGoToProfile},'Ir a Perfil')
   );
-  return h('div',{className:'card'},
-    h('div',{className:'cardtitle'},'Tu perfil'),
-    h('div',{className:'grid3'},
-      h('div',{className:'fg'},h('label',null,'Peso (kg)'),h('input',{type:'number',inputMode:'decimal',min:30,max:250,placeholder:'75',value:profile.weight||'',onChange:e=>onChange({...profile,weight:parseFloat(e.target.value)||0})})),
-      h('div',{className:'fg'},h('label',null,'Sexo'),h('select',{value:profile.sex,onChange:e=>onChange({...profile,sex:e.target.value})},h('option',null,'Hombre'),h('option',null,'Mujer'))),
-      h('div',{className:'fg'},h('label',null,'Edad'),h('input',{type:'number',inputMode:'numeric',min:10,max:100,placeholder:'30',value:profile.age||'',onChange:e=>onChange({...profile,age:parseInt(e.target.value)||0})}))
+  return h('div',{className:'profile-bar'},
+    h('span',null,'Peso actual: ',h('strong',{style:{color:'var(--t1)'}},currentWeight+' kg'),
+      profile.sex?' · '+profile.sex:'',
+      profile.dob?' · '+calcAge(profile.dob)+' años':''),
+    h('button',{className:'btn btns btnsm',onClick:onGoToProfile},'Perfil')
+  );
+}
+
+// ---- Helpers for profile ----
+function calcAge(dob){
+  if(!dob)return '';
+  const b=new Date(dob), now=new Date();
+  let age=now.getFullYear()-b.getFullYear();
+  if(now<new Date(now.getFullYear(),b.getMonth(),b.getDate()))age--;
+  return age;
+}
+function getInitials(name){
+  if(!name)return '?';
+  return name.trim().split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+}
+
+// ---- Profile Tab ----
+function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight}){
+  const [editing,setEditing]=useState(false);
+  const [draft,setDraft]=useState(profile);
+  const [newWeight,setNewWeight]=useState('');
+  const [newWeightDate,setNewWeightDate]=useState(new Date().toISOString().slice(0,10));
+  const chartRef=useRef(); const chartObj=useRef();
+
+  const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:null;
+  const sortedLog=[...weightLog].sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  // Weight chart
+  useEffect(()=>{
+    if(!chartRef.current||sortedLog.length<2)return;
+    if(chartObj.current)chartObj.current.destroy();
+    const dk=matchMedia('(prefers-color-scheme:dark)').matches;
+    const gc=dk?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
+    const tc=dk?'#777':'#888';
+    chartObj.current=new Chart(chartRef.current,{
+      type:'line',
+      data:{
+        labels:sortedLog.map(e=>new Date(e.date).toLocaleDateString('es-ES',{day:'numeric',month:'short'})),
+        datasets:[{
+          data:sortedLog.map(e=>e.weight),
+          borderColor:'#378ADD',backgroundColor:'#378ADD22',
+          fill:true,tension:.35,pointBackgroundColor:'#378ADD',pointRadius:4
+        }]
+      },
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}},
+                y:{grid:{color:gc},ticks:{color:tc,font:{size:10},callback:v=>v+' kg'}}}}
+    });
+    return()=>{if(chartObj.current)chartObj.current.destroy();};
+  },[sortedLog.length]);
+
+  function saveProfile(){
+    if(!draft.sex){alert('Selecciona el sexo');return;}
+    onChange(draft);setEditing(false);
+  }
+  function addWeight(){
+    const w=parseFloat(newWeight);
+    if(!w||w<20||w>300){alert('Introduce un peso válido');return;}
+    onAddWeight({id:Date.now(),date:newWeightDate,weight:w});
+    setNewWeight('');
+  }
+
+  const age=calcAge(profile.dob);
+  const initials=getInitials(profile.name||profile.sex||'');
+
+  return h('div',{className:'content'},
+    // Hero card
+    h('div',{className:'profile-hero'},
+      h('div',{className:'avatar-circle'},initials||h('svg',{viewBox:'0 0 24 24',width:28,height:28,fill:'none',stroke:'#fff',strokeWidth:2,strokeLinecap:'round'},h('circle',{cx:12,cy:8,r:4}),h('path',{d:'M4 20c0-4 3.6-7 8-7s8 3 8 7'}))),
+      h('div',{className:'profile-hero-info'},
+        h('div',{className:'profile-hero-name'},profile.name||'Mi perfil'),
+        h('div',{className:'profile-hero-meta'},
+          [profile.sex, age?age+' años':null, currentWeight?currentWeight+' kg':null].filter(Boolean).join(' · ')||'Completa tu perfil'
+        )
+      ),
+      h('div',{className:'profile-hero-edit'},
+        h('button',{className:'btn btns btnsm',onClick:()=>{setDraft(profile);setEditing(true);}},editing?'Cancelar':'Editar')
+      )
     ),
-    h('div',{className:'method-note'},'Calorías estimadas con valores MET (Ainsworth et al. 2011). Margen de error ±15-25%.'),
-    h('button',{className:'btn btnp',style:{width:'100%'},onClick:()=>{if(profile.weight>0)setEditing(false);else alert('Introduce tu peso');}},'Guardar perfil')
+
+    // Edit form
+    editing&&h('div',{className:'card'},
+      h('div',{className:'cardtitle'},'Editar perfil'),
+      h('div',{className:'fg'},h('label',null,'Nombre'),h('input',{value:draft.name||'',onChange:e=>setDraft({...draft,name:e.target.value}),placeholder:'Tu nombre'})),
+      h('div',{className:'grid2'},
+        h('div',{className:'fg'},h('label',null,'Sexo'),h('select',{value:draft.sex||'',onChange:e=>setDraft({...draft,sex:e.target.value})},
+          h('option',{value:''},'— Seleccionar —'),h('option',{value:'Hombre'},'Hombre'),h('option',{value:'Mujer'},'Mujer')
+        )),
+        h('div',{className:'fg'},h('label',null,'Fecha de nacimiento'),h('input',{type:'date',value:draft.dob||'',onChange:e=>setDraft({...draft,dob:e.target.value}),max:new Date().toISOString().slice(0,10)}))
+      ),
+      h('div',{className:'method-note'},'La edad se calcula automáticamente a partir de la fecha de nacimiento.'),
+      h('button',{className:'btn btnp',style:{width:'100%',marginTop:8},onClick:saveProfile},'Guardar perfil')
+    ),
+
+    // Weight log
+    h('div',{className:'card'},
+      h('div',{className:'cardtitle'},
+        h('span',null,'Registro de peso'),
+        currentWeight&&h('div',{className:'current-weight-badge'},h('span',{className:'w-num'},currentWeight),h('span',{className:'w-unit'},'kg'))
+      ),
+      h('div',{className:'weight-add-row'},
+        h('div',{className:'fg',style:{flex:1,marginBottom:0}},
+          h('label',null,'Peso (kg)'),
+          h('input',{type:'number',inputMode:'decimal',min:20,max:300,step:.1,placeholder:'75.5',value:newWeight,onChange:e=>setNewWeight(e.target.value)})
+        ),
+        h('div',{className:'fg',style:{flex:1,marginBottom:0}},
+          h('label',null,'Fecha'),
+          h('input',{type:'date',value:newWeightDate,onChange:e=>setNewWeightDate(e.target.value),max:new Date().toISOString().slice(0,10)})
+        ),
+        h('button',{className:'btn btnp',style:{height:42,marginBottom:0,whiteSpace:'nowrap'},onClick:addWeight},'+ Añadir')
+      )
+    ),
+
+    // Weight chart
+    sortedLog.length>=2&&h('div',{className:'card'},
+      h('div',{className:'cardtitle'},'Evolución del peso'),
+      h('div',{style:{position:'relative',height:200}},h('canvas',{ref:chartRef}))
+    ),
+
+    // Weight history list
+    sortedLog.length>0&&h('div',{className:'card'},
+      h('div',{className:'cardtitle'},'Historial de peso'),
+      [...sortedLog].reverse().map(e=>h('div',{key:e.id,className:'weight-log-row'},
+        h('div',null,
+          h('div',{className:'weight-log-date'},new Date(e.date).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
+        ),
+        h('div',{style:{display:'flex',alignItems:'center',gap:10}},
+          h('div',{className:'weight-log-val'},e.weight,h('span',null,' kg')),
+          h('button',{className:'btnd',onClick:()=>onRemoveWeight(e.id)},'✕')
+        )
+      ))
+    ),
+
+    sortedLog.length===0&&h('div',{className:'card'},
+      h('div',{className:'empty'},h('div',{className:'empty-icon'},'⚖️'),h('div',null,'Añade tu primer registro de peso'))
+    )
   );
 }
 
@@ -514,11 +666,12 @@ const Icons={
 };
 
 // ---- Workout Tab ----
-function WorkoutTab({sessions,library,onSave,profile,onProfileChange,onAddToLibrary}){
+function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary}){
   const [exercises,setExercises]=useState([]);
   const [showNewEx,setShowNewEx]=useState(false);
   const [newExName,setNewExName]=useState('');
-  const estTotal=profile.weight>0?calcSessionCals(exercises,profile.weight):null;
+  const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
+  const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
 
   function selectFromLibrary(libEx){
     setExercises(prev=>[...prev,{id:Date.now(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
@@ -527,7 +680,7 @@ function WorkoutTab({sessions,library,onSave,profile,onProfileChange,onAddToLibr
   function saveNewToLibrary(libEx){onAddToLibrary(libEx);selectFromLibrary(libEx);}
   function save(){
     if(!exercises.length){alert('Añade al menos un ejercicio');return;}
-    const cal=profile.weight>0?calcSessionCals(exercises,profile.weight):0;
+    const cal=currentWeight>0?calcSessionCals(exercises,currentWeight):0;
     const vol=exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
     const cardioMin=exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
     onSave({id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,calories:cal});
@@ -538,7 +691,7 @@ function WorkoutTab({sessions,library,onSave,profile,onProfileChange,onAddToLibr
     showNewEx&&h(NewExerciseModal,{initialName:newExName,onSave:saveNewToLibrary,onClose:()=>setShowNewEx(false)}),
     h('div',{className:'ptitle'},'HOY'),
     h('div',{className:'psub'},new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})),
-    h(ProfileBanner,{profile,onChange:onProfileChange}),
+    h(ProfileBanner,{profile,weightLog,onGoToProfile}),
     exercises.length>0&&estTotal!==null&&h('div',{className:'cal-preview'},
       h('div',null,h('div',{className:'kcal-num'},'🔥 '+estTotal+' kcal'),h('div',{className:'kcal-sub'},'estimadas esta sesión'),h('div',{className:'kcal-note'},'Se actualiza en tiempo real'))
     ),
@@ -548,7 +701,7 @@ function WorkoutTab({sessions,library,onSave,profile,onProfileChange,onAddToLibr
     ),
     exercises.length>0&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},'Esta sesión ('+(exercises.length)+')'),
-      exercises.map((e,i)=>h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>setExercises(prev=>prev.filter((_,j)=>j!==i)),bw:profile.weight}))
+      exercises.map((e,i)=>h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>setExercises(prev=>prev.filter((_,j)=>j!==i)),bw:currentWeight}))
     ),
     h('div',{style:{display:'flex',gap:10}},
       h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar sesión'),
@@ -708,21 +861,21 @@ function RecTab({sessions}){
 }
 
 // ---- Backup Tab ----
-function BackupTab({sessions,library,profile,onRestore}){
+function BackupTab({sessions,library,profile,weightLog,onRestore}){
   const [importError,setImportError]=useState('');
   const [importOk,setImportOk]=useState(false);
   const fileRef=useRef();
 
   const dataSize=useMemo(()=>{
-    const raw=JSON.stringify({sessions,library,profile});
+    const raw=JSON.stringify({sessions,library,profile,weightLog});
     return (new Blob([raw]).size/1024).toFixed(1);
-  },[sessions,library,profile]);
+  },[sessions,library,profile,weightLog]);
 
   function exportData(){
     const payload={
-      version:1,
+      version:2,
       exportedAt:new Date().toISOString(),
-      sessions,library,profile
+      sessions,library,profile,weightLog
     };
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -810,28 +963,33 @@ function App(){
   const [tab,setTab]=useState('workout');
   const [sessions,setSessions]=useState(()=>loadState('il_sessions',[]));
   const [library,setLibrary]=useState(()=>loadState('il_library',DEFAULT_LIBRARY));
-  const [profile,setProfile]=useState(()=>loadState('il_profile',{weight:0,sex:'Hombre',age:0}));
+  const [profile,setProfile]=useState(()=>loadState('il_profile',{name:'',sex:'',dob:''}));
+  const [weightLog,setWeightLog]=useState(()=>loadState('il_weightlog',[]));
 
   useEffect(()=>saveState('il_sessions',sessions),[sessions]);
   useEffect(()=>saveState('il_library',library),[library]);
   useEffect(()=>saveState('il_profile',profile),[profile]);
+  useEffect(()=>saveState('il_weightlog',weightLog),[weightLog]);
 
   function addSession(s){setSessions(prev=>[s,...prev]);}
   function addToLibrary(ex){setLibrary(prev=>[...prev,ex]);}
   function removeFromLibrary(id){setLibrary(prev=>prev.filter(e=>e.id!==id));}
+  function addWeight(entry){setWeightLog(prev=>[...prev,entry].sort((a,b)=>new Date(a.date)-new Date(b.date)));}
+  function removeWeight(id){setWeightLog(prev=>prev.filter(e=>e.id!==id));}
   function restoreBackup(data){
     setSessions(data.sessions);
     setLibrary(data.library);
     if(data.profile)setProfile(data.profile);
+    if(data.weightLog)setWeightLog(data.weightLog);
   }
 
   const TABS=[
-    {id:'workout',label:'Hoy',Icon:Icons.workout},
-    {id:'library',label:'Ejercicios',Icon:Icons.library},
-    {id:'history',label:'Historial',Icon:Icons.history},
-    {id:'stats',label:'Stats',Icon:Icons.stats},
-    {id:'rec',label:'Consejos',Icon:Icons.rec},
-    {id:'backup',label:'Backup',Icon:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4'}),h('polyline',{points:'7 10 12 15 17 10'}),h('line',{x1:'12',y1:'15',x2:'12',y2:'3'}))},
+    {id:'workout', label:'Hoy',      Icon:Icons.workout},
+    {id:'library', label:'Ejercicios',Icon:Icons.library},
+    {id:'history', label:'Historial', Icon:Icons.history},
+    {id:'stats',   label:'Stats',     Icon:Icons.stats},
+    {id:'profile', label:'Perfil',    Icon:()=>h('svg',{viewBox:'0 0 24 24'},h('circle',{cx:12,cy:8,r:4}),h('path',{d:'M4 20c0-4 3.6-7 8-7s8 3 8 7'}))},
+    {id:'backup',  label:'Backup',    Icon:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4'}),h('polyline',{points:'7 10 12 15 17 10'}),h('line',{x1:'12',y1:'15',x2:'12',y2:'3'}))},
   ];
 
   return h('div',{className:'app'},
@@ -844,12 +1002,12 @@ function App(){
         h(t.Icon),h('span',null,t.label)
       ))
     ),
-    tab==='workout'&&h(WorkoutTab,{sessions,library,onSave:addSession,profile,onProfileChange:p=>{setProfile(p);},onAddToLibrary:addToLibrary}),
-    tab==='library'&&h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary}),
-    tab==='history'&&h(HistoryTab,{sessions}),
-    tab==='stats'&&h(StatsTab,{sessions}),
-    tab==='rec'&&h(RecTab,{sessions}),
-    tab==='backup'&&h(BackupTab,{sessions,library,profile,onRestore:restoreBackup})
+    tab==='workout' &&h(WorkoutTab,{sessions,library,onSave:addSession,profile,weightLog,onGoToProfile:()=>setTab('profile'),onAddToLibrary:addToLibrary}),
+    tab==='library' &&h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary}),
+    tab==='history' &&h(HistoryTab,{sessions}),
+    tab==='stats'   &&h(StatsTab,{sessions}),
+    tab==='profile' &&h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight}),
+    tab==='backup'  &&h(BackupTab,{sessions,library,profile,weightLog,onRestore:restoreBackup})
   );
 }
 
