@@ -295,6 +295,29 @@ body{
 .rowflex{display:flex;gap:8px;align-items:center;justify-content:space-between}
 .empty{text-align:center;padding:40px 16px;color:var(--t2)}
 
+/* Workout Timer */
+.workout-timer{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border:0.5px solid var(--border);border-radius:12px;margin-bottom:12px}
+.timer-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:timerPulse 1.4s ease-in-out infinite}
+@keyframes timerPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.65)}}
+.timer-display{font-size:22px;font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums;letter-spacing:1px;flex:1}
+.timer-label{font-size:11px;color:var(--t2);font-weight:500}
+
+/* Training Calendar */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-nav-btn{width:32px;height:32px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+.cal-nav-btn:active{background:var(--bg2)}
+.cal-month-label{font-size:15px;font-weight:700;color:var(--t1)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-dow{font-size:10px;font-weight:600;color:var(--t2);text-align:center;padding:4px 0;text-transform:uppercase;letter-spacing:.3px}
+.cal-day{aspect-ratio:1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--t2);position:relative;cursor:default}
+.cal-day.other-month{opacity:.28}
+.cal-day.trained{background:var(--accent);color:#fff;font-weight:700}
+.cal-day.today{box-shadow:0 0 0 2px var(--accent2);color:var(--accent2);font-weight:700}
+.cal-day.trained.today{background:var(--accent);color:#fff;box-shadow:0 0 0 2px var(--accent)}
+.cal-day.trained::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.6)}
+.cal-legend{display:flex;align-items:center;gap:16px;margin-top:10px;font-size:11px;color:var(--t2)}
+.cal-legend-dot{width:12px;height:12px;border-radius:4px;flex-shrink:0}
+
 /* Session Complete Modal */
 .sc-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;
@@ -833,17 +856,27 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
         h('span',null,'Registro de peso'),
         currentWeight&&h('div',{className:'current-weight-badge'},h('span',{className:'w-num'},currentWeight),h('span',{className:'w-unit'},'kg'))
       ),
-      h('div',{className:'weight-add-row'},
-        h('div',{className:'fg',style:{flex:1,marginBottom:0}},
+      h('div',{style:{display:'flex',gap:8,alignItems:'flex-end',marginBottom:4}},
+        h('div',{className:'fg',style:{flex:'1 1 90px',marginBottom:0}},
           h('label',null,'Peso (kg)'),
           h('input',{type:'number',inputMode:'decimal',min:20,max:300,step:.1,placeholder:'75.5',value:newWeight,onChange:e=>setNewWeight(e.target.value)})
         ),
-        h('div',{className:'fg',style:{flex:1,marginBottom:0}},
-          h('label',null,'Fecha'),
-          h('input',{type:'date',value:newWeightDate,onChange:e=>setNewWeightDate(e.target.value),max:new Date().toISOString().slice(0,10)})
-        ),
-        h('button',{className:'btn btnp',style:{height:42,marginBottom:0,whiteSpace:'nowrap'},onClick:addWeight},'+ Añadir')
-      )
+        h('div',{className:'fg',style:{flex:'1 1 90px',marginBottom:0}},
+          h('label',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+            h('span',null,'Fecha'),
+            h('button',{
+              onClick:()=>setNewWeightDate(newWeightDate===new Date().toISOString().slice(0,10)?'custom':new Date().toISOString().slice(0,10)),
+              style:{fontSize:10,color:'var(--accent2)',background:'transparent',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:600,padding:0}
+            },newWeightDate===new Date().toISOString().slice(0,10)?'cambiar':'hoy')
+          ),
+          newWeightDate===new Date().toISOString().slice(0,10)||newWeightDate==='custom'
+            ? newWeightDate==='custom'
+              ? h('input',{type:'date',value:'',onChange:e=>setNewWeightDate(e.target.value||new Date().toISOString().slice(0,10)),max:new Date().toISOString().slice(0,10),style:{fontSize:14}})
+              : h('div',{style:{height:42,border:'0.5px solid var(--border2)',borderRadius:10,padding:'0 12px',background:'var(--bg2)',display:'flex',alignItems:'center',fontSize:15,color:'var(--t2)',fontWeight:500}},'Hoy')
+            : h('input',{type:'date',value:newWeightDate,onChange:e=>setNewWeightDate(e.target.value),max:new Date().toISOString().slice(0,10),style:{fontSize:14}})
+        )
+      ),
+      h('button',{className:'btn btnp',style:{width:'100%',marginTop:6},onClick:addWeight},'+ Añadir registro')
     ),
 
     // Weight chart
@@ -887,130 +920,213 @@ const Icons={
   rec:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V9l-6-6z'}),h('path',{d:'M9 3v6h6M12 11v6M9 14h6'})),
 };
 
-// ---- Body Map SVG ----
-// Intensity 0-1 → colour from dim base to vivid red
-function muscleColor(intensity){
-  if(intensity<=0) return 'rgba(80,78,74,0.35)';
-  const r=Math.round(60+160*intensity);
-  const g=Math.round(58-40*intensity);
-  const b=Math.round(56-40*intensity);
-  const a=0.35+0.65*intensity;
-  return `rgba(${r},${g},${b},${a})`;
-}
-
 // Map app muscle groups → body-region keys
 const MUSCLE_TO_REGIONS={
-  Pecho:      ['chest'],
-  Espalda:    ['upperback','lats'],
-  Piernas:    ['quads','hamstrings','calves'],
-  Hombros:    ['deltF','deltB'],
-  Bíceps:     ['biceps'],
-  Tríceps:    ['triceps'],
-  Core:       ['abs'],
-  Glúteos:    ['glutes'],
-  Cardio:     ['chest','upperback','lats','quads','hamstrings','abs','deltF','deltB'],
+  Pecho:   ['chest'],
+  Espalda: ['upperback','lats'],
+  Piernas: ['quads','hamstrings','calves'],
+  Hombros: ['deltF','deltB'],
+  Bíceps:  ['biceps'],
+  Tríceps: ['triceps'],
+  Core:    ['abs'],
+  Glúteos: ['glutes'],
+  Cardio:  ['chest','upperback','lats','quads','hamstrings','abs','deltF','deltB'],
 };
 
+// ---- Body Map SVG — detailed anatomical illustration ----
+function muscleColor(intensity,base){
+  if(intensity<=0)return base||'rgba(90,85,80,0.18)';
+  const t=Math.pow(intensity,.7);
+  const r=Math.round(210+25*t), g=Math.round(55-45*t), b=Math.round(55-45*t);
+  const a=0.25+0.75*t;
+  return `rgba(${r},${g},${b},${a})`;
+}
+const SKIN='rgba(195,165,130,0.55)';
+const BODY='rgba(80,75,70,0.14)';
+const LINE='rgba(255,255,255,0.08)';
+
+function FrontBody({ri}){
+  const c=k=>muscleColor(ri[k]||0);
+  return h('svg',{viewBox:'0 0 110 230',width:110,height:230,style:{display:'block',overflow:'visible'}},
+    h('defs',null,
+      h('radialGradient',{id:'headG',cx:'45%',cy:'38%',r:'55%'},
+        h('stop',{offset:'0%',stopColor:'rgba(210,175,140,0.7)'}),
+        h('stop',{offset:'100%',stopColor:'rgba(175,140,110,0.45)'})
+      )
+    ),
+    // --- Silhouette base ---
+    h('path',{d:'M42 55 C30 57 22 64 20 76 L16 118 C15 122 18 125 22 125 L88 125 C92 125 95 122 94 118 L90 76 C88 64 80 57 68 55 Z',fill:BODY}),
+    h('path',{d:'M22 125 C20 138 20 148 22 158 L44 160 L66 160 L88 158 C90 148 90 138 88 125 Z',fill:BODY,opacity:.8}),
+    h('path',{d:'M22 158 C18 172 19 188 22 202 L34 206 L40 202 C41 188 41 172 39 158 Z',fill:BODY}),
+    h('path',{d:'M88 158 C92 172 91 188 88 202 L76 206 L70 202 C69 188 69 172 71 158 Z',fill:BODY}),
+    h('path',{d:'M22 202 C20 210 21 218 23 224 L32 226 L36 222 C37 214 36 207 34 202 Z',fill:BODY}),
+    h('path',{d:'M88 202 C90 210 89 218 87 224 L78 226 L74 222 C73 214 74 207 76 202 Z',fill:BODY}),
+    // Arms base
+    h('path',{d:'M20 76 C15 78 10 84 9 94 L8 112 C8 116 11 119 14 118 L22 116 C22 116 20 100 22 76 Z',fill:BODY}),
+    h('path',{d:'M90 76 C95 78 100 84 101 94 L102 112 C102 116 99 119 96 118 L88 116 C88 116 90 100 88 76 Z',fill:BODY}),
+    h('path',{d:'M8 112 C7 118 7 126 8 134 L10 140 C12 141 15 140 16 138 L18 118 Z',fill:BODY}),
+    h('path',{d:'M102 112 C103 118 103 126 102 134 L100 140 C98 141 95 140 94 138 L92 118 Z',fill:BODY}),
+    h('ellipse',{cx:9,cy:143,rx:5,ry:7,fill:SKIN,opacity:.6}),
+    h('ellipse',{cx:101,cy:143,rx:5,ry:7,fill:SKIN,opacity:.6}),
+
+    // --- Chest (pectorals) ---
+    h('path',{d:'M38 57 C34 61 32 67 34 72 C38 76 44 77 55 77 C66 77 72 76 76 72 C78 67 76 61 72 57 C66 54 60 53 55 53 C50 53 44 54 38 57 Z',fill:c('chest'),opacity:.95}),
+    // pec divide line
+    h('line',{x1:55,y1:57,x2:55,y2:77,stroke:LINE,strokeWidth:.8}),
+    // lower pec curve
+    h('path',{d:'M34 72 Q45 80 55 79 Q65 80 76 72',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
+
+    // --- Front delts ---
+    h('ellipse',{cx:24,cy:63,rx:9,ry:7,fill:c('deltF'),transform:'rotate(-18,24,63)',opacity:.95}),
+    h('ellipse',{cx:86,cy:63,rx:9,ry:7,fill:c('deltF'),transform:'rotate(18,86,63)',opacity:.95}),
+
+    // --- Biceps ---
+    h('path',{d:'M11 82 C9 88 9 96 10 104 C13 108 17 108 19 105 C21 97 22 88 20 80 C17 78 13 79 11 82 Z',fill:c('biceps'),opacity:.95}),
+    h('path',{d:'M99 82 C101 88 101 96 100 104 C97 108 93 108 91 105 C89 97 88 88 90 80 C93 78 97 79 99 82 Z',fill:c('biceps'),opacity:.95}),
+    // bicep peak line
+    h('path',{d:'M11 90 Q15 86 19 90',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
+    h('path',{d:'M99 90 Q95 86 91 90',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
+
+    // --- Forearms ---
+    h('path',{d:'M9 107 C8 114 8 122 9 130 L11 136 C13 137 16 136 17 133 L18 106 Z',fill:SKIN,opacity:.7}),
+    h('path',{d:'M101 107 C102 114 102 122 101 130 L99 136 C97 137 94 136 93 133 L92 106 Z',fill:SKIN,opacity:.7}),
+
+    // --- Abs ---
+    h('path',{d:'M42 78 L68 78 L70 118 L55 121 L40 118 Z',fill:'transparent'}),
+    // 3 rows of 2 abs
+    ...[0,1,2].map(row=>[
+      h('path',{key:'abl'+row,d:`M43 ${79+row*13} L53 ${79+row*13} L52 ${90+row*13} L43 ${90+row*13} Z`,fill:c('abs'),rx:2,opacity:.85}),
+      h('path',{key:'abr'+row,d:`M57 ${79+row*13} L67 ${79+row*13} L67 ${90+row*13} L58 ${90+row*13} Z`,fill:c('abs'),rx:2,opacity:.85}),
+    ]).flat(),
+    // linea alba
+    h('line',{x1:55,y1:78,x2:55,y2:118,stroke:'rgba(0,0,0,0.12)',strokeWidth:.7}),
+    // horizontal ab lines
+    ...[79,92,105].map(y=>h('line',{key:y,x1:43,y1:y,x2:67,y2:y,stroke:'rgba(0,0,0,0.1)',strokeWidth:.6})),
+
+    // --- Obliques ---
+    h('path',{d:'M38 90 L42 78 L42 118 L36 110 Z',fill:c('abs'),opacity:.6}),
+    h('path',{d:'M72 90 L68 78 L68 118 L74 110 Z',fill:c('abs'),opacity:.6}),
+
+    // --- Hip/iliac crest ---
+    h('path',{d:'M22 125 Q35 132 55 133 Q75 132 88 125 L88 128 Q75 136 55 137 Q35 136 22 128 Z',fill:BODY,opacity:.6}),
+
+    // --- Quads ---
+    h('path',{d:'M22 158 C20 170 20 186 23 200 L33 204 L39 200 C42 186 43 170 42 158 C38 155 27 154 22 158 Z',fill:c('quads'),opacity:.95}),
+    h('path',{d:'M88 158 C90 170 90 186 87 200 L77 204 L71 200 C68 186 67 170 68 158 C72 155 83 154 88 158 Z',fill:c('quads'),opacity:.95}),
+    // VMO (inner quad sweep)
+    h('path',{d:'M39 158 C41 168 44 180 44 196 L56 196 C56 180 59 168 71 158 C66 154 44 154 39 158 Z',fill:c('quads'),opacity:.8}),
+    // quad separation lines
+    h('path',{d:'M30 160 C32 178 34 194 34 202',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
+    h('path',{d:'M80 160 C78 178 76 194 76 202',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
+
+    // --- Calves ---
+    h('path',{d:'M22 204 C20 211 20 218 22 224 L31 227 L36 224 C37 216 37 208 35 204 Z',fill:c('calves'),opacity:.95}),
+    h('path',{d:'M88 204 C90 211 90 218 88 224 L79 227 L74 224 C73 216 73 208 75 204 Z',fill:c('calves'),opacity:.95}),
+    // calf split
+    h('path',{d:'M29 206 C29 215 29 221 30 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
+    h('path',{d:'M81 206 C81 215 81 221 80 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
+
+    // --- Head ---
+    h('ellipse',{cx:55,cy:30,rx:16,ry:19,fill:'url(#headG)'}),
+    h('path',{d:'M39 42 C39 46 43 50 55 51 C67 50 71 46 71 42',fill:SKIN,opacity:.4}),
+    // neck
+    h('path',{d:'M48 48 L48 56 C50 57 53 58 55 58 C57 58 60 57 62 56 L62 48 Z',fill:SKIN,opacity:.65}),
+  );
+}
+
+function BackBody({ri}){
+  const c=k=>muscleColor(ri[k]||0);
+  return h('svg',{viewBox:'0 0 110 230',width:110,height:230,style:{display:'block',overflow:'visible'}},
+    h('defs',null,
+      h('radialGradient',{id:'headG2',cx:'45%',cy:'38%',r:'55%'},
+        h('stop',{offset:'0%',stopColor:'rgba(210,175,140,0.7)'}),
+        h('stop',{offset:'100%',stopColor:'rgba(175,140,110,0.45)'})
+      )
+    ),
+    // --- Silhouette ---
+    h('path',{d:'M42 55 C30 57 22 64 20 76 L16 118 C15 122 18 125 22 125 L88 125 C92 125 95 122 94 118 L90 76 C88 64 80 57 68 55 Z',fill:BODY}),
+    h('path',{d:'M22 125 C20 138 20 150 22 162 L44 165 L66 165 L88 162 C90 150 90 138 88 125 Z',fill:BODY,opacity:.8}),
+    h('path',{d:'M22 162 C18 176 18 192 22 206 L35 210 L41 206 C42 192 42 176 39 162 Z',fill:BODY}),
+    h('path',{d:'M88 162 C92 176 92 192 88 206 L75 210 L69 206 C68 192 68 176 71 162 Z',fill:BODY}),
+    h('path',{d:'M22 206 C20 213 20 220 22 226 L31 228 L36 224 C37 216 36 208 35 206 Z',fill:BODY}),
+    h('path',{d:'M88 206 C90 213 90 220 88 226 L79 228 L74 224 C73 216 74 208 75 206 Z',fill:BODY}),
+    // Arms base
+    h('path',{d:'M20 76 C15 78 9 84 8 96 L7 114 C7 118 10 120 14 119 L22 117 Z',fill:BODY}),
+    h('path',{d:'M90 76 C95 78 101 84 102 96 L103 114 C103 118 100 120 96 119 L88 117 Z',fill:BODY}),
+    h('path',{d:'M7 114 C6 121 6 129 8 136 L10 141 C12 142 15 141 16 138 L17 117 Z',fill:BODY}),
+    h('path',{d:'M103 114 C104 121 104 129 102 136 L100 141 C98 142 95 141 94 138 L93 117 Z',fill:BODY}),
+    h('ellipse',{cx:9,cy:144,rx:5,ry:7,fill:SKIN,opacity:.55}),
+    h('ellipse',{cx:101,cy:144,rx:5,ry:7,fill:SKIN,opacity:.55}),
+
+    // --- Trapezius ---
+    h('path',{d:'M42 55 C46 52 50 51 55 51 C60 51 64 52 68 55 L65 70 C62 67 59 66 55 66 C51 66 48 67 45 70 Z',fill:c('upperback'),opacity:.95}),
+    // trap mid sections
+    h('path',{d:'M22 72 C28 68 36 67 45 70 L43 90 C36 88 28 88 22 90 Z',fill:c('upperback'),opacity:.7}),
+    h('path',{d:'M88 72 C82 68 74 67 65 70 L67 90 C74 88 82 88 88 90 Z',fill:c('upperback'),opacity:.7}),
+    // trap spine line
+    h('line',{x1:55,y1:55,x2:55,y2:90,stroke:'rgba(0,0,0,0.1)',strokeWidth:.8}),
+
+    // --- Rear delts ---
+    h('ellipse',{cx:24,cy:63,rx:9,ry:7,fill:c('deltB'),transform:'rotate(-18,24,63)',opacity:.95}),
+    h('ellipse',{cx:86,cy:63,rx:9,ry:7,fill:c('deltB'),transform:'rotate(18,86,63)',opacity:.95}),
+
+    // --- Triceps ---
+    h('path',{d:'M10 82 C8 90 8 100 10 108 C13 112 17 112 19 108 C21 98 22 88 20 80 C17 78 12 79 10 82 Z',fill:c('triceps'),opacity:.95}),
+    h('path',{d:'M100 82 C102 90 102 100 100 108 C97 112 93 112 91 108 C89 98 88 88 90 80 C93 78 98 79 100 82 Z',fill:c('triceps'),opacity:.95}),
+    h('path',{d:'M11 95 Q15 91 19 95',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
+    h('path',{d:'M99 95 Q95 91 91 95',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
+
+    // --- Forearms ---
+    h('path',{d:'M9 110 C8 118 8 126 10 133 L12 138 C14 139 16 138 17 135 L18 108 Z',fill:SKIN,opacity:.65}),
+    h('path',{d:'M101 110 C102 118 102 126 100 133 L98 138 C96 139 94 138 93 135 L92 108 Z',fill:SKIN,opacity:.65}),
+
+    // --- Lats ---
+    h('path',{d:'M20 80 C18 72 22 66 30 64 L45 70 L43 108 C34 106 24 98 20 86 Z',fill:c('lats'),opacity:.95}),
+    h('path',{d:'M90 80 C92 72 88 66 80 64 L65 70 L67 108 C76 106 86 98 90 86 Z',fill:c('lats'),opacity:.95}),
+
+    // --- Lower back (erectors) ---
+    h('path',{d:'M43 90 L45 122 L49 124 L49 90 Z',fill:c('upperback'),opacity:.5}),
+    h('path',{d:'M67 90 L65 122 L61 124 L61 90 Z',fill:c('upperback'),opacity:.5}),
+    h('path',{d:'M45 90 L49 90 L49 124 L45 124 Z',fill:c('upperback'),opacity:.25}),
+    h('path',{d:'M61 90 L65 90 L65 124 L61 124 Z',fill:c('upperback'),opacity:.25}),
+
+    // --- Glutes ---
+    h('path',{d:'M22 126 C20 136 19 148 22 160 C29 167 40 168 55 167 C70 168 81 167 88 160 C91 148 90 136 88 126 Z',fill:c('glutes'),opacity:.95}),
+    h('path',{d:'M55 127 L55 167',stroke:'rgba(0,0,0,0.1)',strokeWidth:.8}),
+    h('path',{d:'M22 140 Q35 148 55 149 Q75 148 88 140',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.7}),
+
+    // --- Hamstrings ---
+    h('path',{d:'M22 162 C19 175 19 191 22 204 L35 208 L41 204 C42 190 42 174 40 162 C35 158 27 158 22 162 Z',fill:c('hamstrings'),opacity:.95}),
+    h('path',{d:'M88 162 C91 175 91 191 88 204 L75 208 L69 204 C68 190 68 174 70 162 C75 158 83 158 88 162 Z',fill:c('hamstrings'),opacity:.95}),
+    // inner ham
+    h('path',{d:'M40 162 C41 174 43 190 44 202 L66 202 C67 190 69 174 70 162 C66 158 44 158 40 162 Z',fill:c('hamstrings'),opacity:.7}),
+    h('path',{d:'M31 164 C31 180 31 196 32 204',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
+    h('path',{d:'M79 164 C79 180 79 196 78 204',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
+
+    // --- Calves back ---
+    h('path',{d:'M22 206 C20 213 19 220 22 226 L31 228 L36 224 C37 216 36 208 35 206 Z',fill:c('calves'),opacity:.95}),
+    h('path',{d:'M88 206 C90 213 91 220 88 226 L79 228 L74 224 C73 216 74 208 75 206 Z',fill:c('calves'),opacity:.95}),
+    h('path',{d:'M28 208 C28 216 28 222 29 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
+    h('path',{d:'M82 208 C82 216 82 222 81 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
+
+    // --- Head ---
+    h('ellipse',{cx:55,cy:30,rx:16,ry:19,fill:'url(#headG2)'}),
+    h('path',{d:'M39 42 C39 46 43 50 55 51 C67 50 71 46 71 42',fill:SKIN,opacity:.35}),
+    h('path',{d:'M48 48 L48 56 C50 57 53 58 55 58 C57 58 60 57 62 56 L62 48 Z',fill:SKIN,opacity:.6}),
+  );
+}
+
 function BodyMap({muscleIntensity}){
-  // muscleIntensity: {Pecho:0.8, Espalda:0.5, ...}  values 0-1
   const regionIntensity={};
   Object.entries(muscleIntensity).forEach(([muscle,intensity])=>{
     const regions=MUSCLE_TO_REGIONS[muscle]||[];
     regions.forEach(r=>{
-      regionIntensity[r]=Math.max(regionIntensity[r]||0, intensity*(muscle==='Cardio'?0.4:1));
+      regionIntensity[r]=Math.max(regionIntensity[r]||0,intensity*(muscle==='Cardio'?0.4:1));
     });
   });
-  const c=r=>muscleColor(regionIntensity[r]||0);
-  const body='rgba(100,95,88,0.18)';
-  const skin='rgba(120,115,108,0.22)';
-
-  // Front view
-  const front=h('svg',{viewBox:'0 0 90 190',width:90,height:190,style:{display:'block'}},
-    // torso
-    h('path',{d:'M30 52 Q22 56 20 70 L18 115 Q18 118 21 118 L69 118 Q72 118 72 115 L70 70 Q68 56 60 52 Z',fill:body}),
-    // chest
-    h('path',{d:'M30 53 Q34 58 45 60 Q56 58 60 53 Q56 48 45 48 Q34 48 30 53 Z',fill:c('chest')}),
-    // abs
-    h('path',{d:'M37 62 L53 62 L55 92 L45 95 L35 92 Z',fill:c('abs'),opacity:.9}),
-    // head
-    h('ellipse',{cx:45,cy:28,rx:13,ry:16,fill:skin}),
-    // neck
-    h('rect',{x:40,y:43,width:10,height:8,rx:3,fill:skin}),
-    // left shoulder/delt
-    h('ellipse',{cx:22,cy:58,rx:10,ry:8,fill:c('deltF'),transform:'rotate(-10,22,58)'}),
-    // right shoulder/delt
-    h('ellipse',{cx:68,cy:58,rx:10,ry:8,fill:c('deltF'),transform:'rotate(10,68,58)'}),
-    // left upper arm / bicep
-    h('path',{d:'M16 65 Q12 72 13 84 Q17 88 21 85 Q24 74 22 65 Z',fill:c('biceps')}),
-    // right upper arm / bicep
-    h('path',{d:'M74 65 Q78 72 77 84 Q73 88 69 85 Q66 74 68 65 Z',fill:c('biceps')}),
-    // left forearm
-    h('path',{d:'M13 86 Q10 96 11 106 Q15 109 18 107 Q20 97 21 86 Z',fill:skin}),
-    // right forearm
-    h('path',{d:'M77 86 Q80 96 79 106 Q75 109 72 107 Q70 97 69 86 Z',fill:skin}),
-    // left hand
-    h('ellipse',{cx:14,cy:110,rx:5,ry:7,fill:skin}),
-    // right hand
-    h('ellipse',{cx:76,cy:110,rx:5,ry:7,fill:skin}),
-    // hips
-    h('path',{d:'M21 118 Q20 128 22 135 L45 136 L68 135 Q70 128 69 118 Z',fill:body,opacity:.7}),
-    // left quad
-    h('path',{d:'M22 136 Q18 150 20 168 Q25 174 31 172 Q36 155 35 136 Z',fill:c('quads')}),
-    // right quad
-    h('path',{d:'M68 136 Q72 150 70 168 Q65 174 59 172 Q54 155 55 136 Z',fill:c('quads')}),
-    // left inner quad gap fill
-    h('path',{d:'M35 136 Q38 155 38 172 L45 172 L45 136 Z',fill:c('quads'),opacity:.7}),
-    h('path',{d:'M55 136 Q52 155 52 172 L45 172 L45 136 Z',fill:c('quads'),opacity:.7}),
-    // left calf
-    h('path',{d:'M20 172 Q18 180 21 188 Q26 190 30 188 Q32 180 31 172 Z',fill:c('calves')}),
-    // right calf
-    h('path',{d:'M70 172 Q72 180 69 188 Q64 190 60 188 Q58 180 59 172 Z',fill:c('calves')}),
-  );
-
-  // Back view
-  const back=h('svg',{viewBox:'0 0 90 190',width:90,height:190,style:{display:'block'}},
-    // torso
-    h('path',{d:'M30 52 Q22 56 20 70 L18 115 Q18 118 21 118 L69 118 Q72 118 72 115 L70 70 Q68 56 60 52 Z',fill:body}),
-    // upper back / traps
-    h('path',{d:'M30 52 Q36 50 45 50 Q54 50 60 52 L58 68 Q53 65 45 64 Q37 65 32 68 Z',fill:c('upperback')}),
-    // lats
-    h('path',{d:'M20 72 Q22 62 32 68 L34 95 Q26 100 20 98 Z',fill:c('lats')}),
-    h('path',{d:'M70 72 Q68 62 58 68 L56 95 Q64 100 70 98 Z',fill:c('lats')}),
-    // lower back
-    h('path',{d:'M32 95 L34 115 L56 115 L58 95 Q53 92 45 92 Q37 92 32 95 Z',fill:body,opacity:.8}),
-    // head
-    h('ellipse',{cx:45,cy:28,rx:13,ry:16,fill:skin}),
-    // neck
-    h('rect',{x:40,y:43,width:10,height:8,rx:3,fill:skin}),
-    // left rear delt
-    h('ellipse',{cx:22,cy:58,rx:10,ry:8,fill:c('deltB'),transform:'rotate(-10,22,58)'}),
-    // right rear delt
-    h('ellipse',{cx:68,cy:58,rx:10,ry:8,fill:c('deltB'),transform:'rotate(10,68,58)'}),
-    // left tricep
-    h('path',{d:'M16 65 Q11 72 12 84 Q16 88 20 86 Q24 76 22 65 Z',fill:c('triceps')}),
-    // right tricep
-    h('path',{d:'M74 65 Q79 72 78 84 Q74 88 70 86 Q66 76 68 65 Z',fill:c('triceps')}),
-    // forearms
-    h('path',{d:'M12 86 Q9 96 10 106 Q14 109 17 107 Q20 97 20 86 Z',fill:skin}),
-    h('path',{d:'M78 86 Q81 96 80 106 Q76 109 73 107 Q70 97 70 86 Z',fill:skin}),
-    h('ellipse',{cx:13,cy:110,rx:5,ry:7,fill:skin}),
-    h('ellipse',{cx:77,cy:110,rx:5,ry:7,fill:skin}),
-    // glutes
-    h('path',{d:'M21 118 Q19 130 22 138 Q30 142 45 141 Q60 142 68 138 Q71 130 69 118 Z',fill:c('glutes')}),
-    // left hamstring
-    h('path',{d:'M22 138 Q20 152 22 170 Q27 174 32 172 Q35 155 34 138 Z',fill:c('hamstrings')}),
-    // right hamstring
-    h('path',{d:'M68 138 Q70 152 68 170 Q63 174 58 172 Q55 155 56 138 Z',fill:c('hamstrings')}),
-    h('path',{d:'M34 138 Q37 155 37 172 L45 172 L45 138 Z',fill:c('hamstrings'),opacity:.7}),
-    h('path',{d:'M56 138 Q53 155 53 172 L45 172 L45 138 Z',fill:c('hamstrings'),opacity:.7}),
-    // calves back
-    h('path',{d:'M22 172 Q20 180 22 188 Q27 190 31 188 Q33 181 32 172 Z',fill:c('calves')}),
-    h('path',{d:'M68 172 Q70 180 68 188 Q63 190 59 188 Q57 181 58 172 Z',fill:c('calves')}),
-  );
-
   return h('div',{className:'sc-map-wrap'},
-    h('div',{className:'sc-map-side'},front,h('div',{className:'sc-map-side-label'},'Frontal')),
-    h('div',{className:'sc-map-side'},back,h('div',{className:'sc-map-side-label'},'Posterior'))
+    h('div',{className:'sc-map-side'},h(FrontBody,{ri:regionIntensity}),h('div',{className:'sc-map-side-label'},'Frontal')),
+    h('div',{className:'sc-map-side'},h(BackBody,{ri:regionIntensity}),h('div',{className:'sc-map-side-label'},'Posterior'))
   );
 }
 
@@ -1050,32 +1166,36 @@ function SessionCompleteModal({session,onClose}){
 
   const totalSets=session.exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.length,0);
   const totalCardioMin=session.exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
+  const durationSecs=session.durationSecs||0;
   const greeting=CONGRATS[Math.floor(Math.random()*CONGRATS.length)];
   const timeStr=new Date(session.date).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
 
   if(!visible)return null;
   return h('div',{className:'sc-overlay',onClick:e=>{if(e.target===e.currentTarget)onClose()}},
     h('div',{className:'sc-sheet'},
-      // Header
       h('div',{className:'sc-header'},
         h('span',{className:'sc-emoji'},'💪'),
         h('div',{className:'sc-title'},greeting),
         h('div',{className:'sc-subtitle'},new Date(session.date).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})+' · '+timeStr)
       ),
-
       h('div',{className:'sc-body'},
-        // Stats row
         h('div',{className:'sc-stats-row'},
           h('div',{className:'sc-stat highlight'},
             h('div',{className:'sc-stat-val'},session.calories||0),
             h('div',{className:'sc-stat-unit'},'kcal'),
             h('div',{className:'sc-stat-label'},'Calorías')
           ),
-          h('div',{className:'sc-stat'},
-            h('div',{className:'sc-stat-val'},session.exercises.length),
-            h('div',{className:'sc-stat-unit'},'ejercicios'),
-            h('div',{className:'sc-stat-label'},'Realizados')
-          ),
+          durationSecs>0
+            ? h('div',{className:'sc-stat'},
+                h('div',{className:'sc-stat-val'},fmtDuration(durationSecs)),
+                h('div',{className:'sc-stat-unit'},'duración'),
+                h('div',{className:'sc-stat-label'},'Tiempo')
+              )
+            : h('div',{className:'sc-stat'},
+                h('div',{className:'sc-stat-val'},session.exercises.length),
+                h('div',{className:'sc-stat-unit'},'ejercicios'),
+                h('div',{className:'sc-stat-label'},'Realizados')
+              ),
           totalSets>0
             ? h('div',{className:'sc-stat'},
                 h('div',{className:'sc-stat-val'},totalSets),
@@ -1088,7 +1208,9 @@ function SessionCompleteModal({session,onClose}){
                 h('div',{className:'sc-stat-label'},'Cardio')
               )
         ),
-        session.totalVolume>0&&h('div',{style:{textAlign:'center',fontSize:13,color:'var(--t2)',marginBottom:20,marginTop:-6}},'Volumen total: ',h('strong',{style:{color:'var(--t1)'}},Math.round(session.totalVolume).toLocaleString('es-ES')+' kg')),
+        session.totalVolume>0&&h('div',{style:{textAlign:'center',fontSize:13,color:'var(--t2)',marginBottom:20,marginTop:-6}},
+          session.exercises.length+' ejercicios · ',h('strong',{style:{color:'var(--t1)'}},Math.round(session.totalVolume).toLocaleString('es-ES')+' kg vol.')
+        ),
 
         // Body map
         h('div',{className:'sc-map-title'},'Músculos trabajados'),
@@ -1115,13 +1237,42 @@ function SessionCompleteModal({session,onClose}){
 }
 
 // ---- Workout Tab ----
+function fmtDuration(secs){
+  const h=Math.floor(secs/3600), m=Math.floor((secs%3600)/60), s=secs%60;
+  if(h>0)return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
 function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary}){
   const [exercises,setExercises]=useState([]);
   const [showNewEx,setShowNewEx]=useState(false);
   const [newExName,setNewExName]=useState('');
   const [completedSession,setCompletedSession]=useState(null);
+  const [timerStart,setTimerStart]=useState(null);
+  const [elapsed,setElapsed]=useState(0);
+  const timerRef=useRef();
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
   const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
+
+  // Start timer on first exercise
+  useEffect(()=>{
+    if(exercises.length===1&&!timerStart){
+      const start=Date.now();
+      setTimerStart(start);
+      setElapsed(0);
+    }
+    if(exercises.length===0){
+      clearInterval(timerRef.current);
+      setTimerStart(null);setElapsed(0);
+    }
+  },[exercises.length]);
+
+  // Tick every second
+  useEffect(()=>{
+    if(!timerStart)return;
+    timerRef.current=setInterval(()=>setElapsed(Math.floor((Date.now()-timerStart)/1000)),1000);
+    return()=>clearInterval(timerRef.current);
+  },[timerStart]);
 
   function selectFromLibrary(libEx){
     setExercises(prev=>[...prev,{id:Date.now(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
@@ -1130,12 +1281,14 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   function saveNewToLibrary(libEx){onAddToLibrary(libEx);selectFromLibrary(libEx);}
   function save(){
     if(!exercises.length){alert('Añade al menos un ejercicio');return;}
+    clearInterval(timerRef.current);
+    const durationSecs=timerStart?Math.floor((Date.now()-timerStart)/1000):0;
     const cal=currentWeight>0?calcSessionCals(exercises,currentWeight):0;
     const vol=exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
     const cardioMin=exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
-    const session={id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,calories:cal};
+    const session={id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,calories:cal,durationSecs};
     onSave(session);
-    setExercises([]);
+    setExercises([]);setTimerStart(null);setElapsed(0);
     setCompletedSession(session);
   }
   return h('div',{className:'content'},
@@ -1144,6 +1297,11 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     h('div',{className:'ptitle'},'HOY'),
     h('div',{className:'psub'},new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})),
     h(ProfileBanner,{profile,weightLog,onGoToProfile}),
+    timerStart&&h('div',{className:'workout-timer'},
+      h('div',{className:'timer-dot'}),
+      h('div',{className:'timer-display'},fmtDuration(elapsed)),
+      h('div',{className:'timer-label'},'Tiempo de sesión')
+    ),
     exercises.length>0&&estTotal!==null&&h('div',{className:'cal-preview'},
       h('div',null,h('div',{className:'kcal-num'},'🔥 '+estTotal+' kcal'),h('div',{className:'kcal-sub'},'estimadas esta sesión'),h('div',{className:'kcal-note'},'Se actualiza en tiempo real'))
     ),
@@ -1157,7 +1315,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     ),
     h('div',{style:{display:'flex',gap:10}},
       h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar sesión'),
-      exercises.length>0&&h('button',{className:'btn btns',onClick:()=>setExercises([])},'Descartar')
+      exercises.length>0&&h('button',{className:'btn btns',onClick:()=>{clearInterval(timerRef.current);setExercises([]);setTimerStart(null);setElapsed(0);}},'Descartar')
     )
   );
 }
@@ -1205,11 +1363,86 @@ function HistoryTab({sessions}){
           h('div',{className:'hmeta'},
             strEx.length>0&&h('span',{className:'sbadge'},strEx.length+' ejercicios'),
             s.totalVolume>0&&h('span',{className:'sbadge'},Math.round(s.totalVolume).toLocaleString('es-ES')+' kg'),
+            s.durationSecs>0&&h('span',{className:'sbadge'},'⏱ '+fmtDuration(s.durationSecs)),
             cardioEx.length>0&&h('span',{className:'sbadge'},'🏃 '+s.totalCardioMin+' min'),
             s.calories>0&&h('span',{className:'sbadge sbadge-cal'},'🔥 '+s.calories+' kcal')
           )
         );
       })
+    )
+  );
+}
+
+// ---- Training Calendar ----
+function TrainingCalendar({sessions}){
+  const now=new Date();
+  const [viewYear,setViewYear]=useState(now.getFullYear());
+  const [viewMonth,setViewMonth]=useState(now.getMonth()); // 0-based
+
+  // Build set of trained date strings "YYYY-MM-DD" for the viewed month
+  const trainedDays=useMemo(()=>{
+    const s=new Set();
+    sessions.forEach(sess=>{
+      const d=new Date(sess.date);
+      if(d.getFullYear()===viewYear&&d.getMonth()===viewMonth){
+        s.add(d.getDate());
+      }
+    });
+    return s;
+  },[sessions,viewYear,viewMonth]);
+
+  function prevMonth(){
+    if(viewMonth===0){setViewMonth(11);setViewYear(y=>y-1);}
+    else setViewMonth(m=>m-1);
+  }
+  function nextMonth(){
+    const ny=viewMonth===11?viewYear+1:viewYear;
+    const nm=viewMonth===11?0:viewMonth+1;
+    // don't go past current month
+    if(ny>now.getFullYear()||(ny===now.getFullYear()&&nm>now.getMonth()))return;
+    setViewMonth(nm);setViewYear(ny);
+  }
+
+  const monthName=new Date(viewYear,viewMonth,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const firstDow=(new Date(viewYear,viewMonth,1).getDay()+6)%7; // Mon=0
+  const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+  const daysInPrev=new Date(viewYear,viewMonth,0).getDate();
+  const totalCells=Math.ceil((firstDow+daysInMonth)/7)*7;
+  const isCurrentMonth=viewYear===now.getFullYear()&&viewMonth===now.getMonth();
+  const trainedCount=trainedDays.size;
+
+  const cells=[];
+  for(let i=0;i<totalCells;i++){
+    let day,isCurrentMonthDay=true;
+    if(i<firstDow){day=daysInPrev-firstDow+1+i;isCurrentMonthDay=false;}
+    else if(i>=firstDow+daysInMonth){day=i-firstDow-daysInMonth+1;isCurrentMonthDay=false;}
+    else{day=i-firstDow+1;}
+    const isTrained=isCurrentMonthDay&&trainedDays.has(day);
+    const isToday=isCurrentMonthDay&&isCurrentMonth&&day===now.getDate();
+    const cls=['cal-day',!isCurrentMonthDay?'other-month':'',isTrained?'trained':'',isToday?'today':''].filter(Boolean).join(' ');
+    cells.push(h('div',{key:i,className:cls},day));
+  }
+
+  const atMaxMonth=isCurrentMonth;
+
+  return h('div',{className:'card'},
+    h('div',{className:'cal-nav'},
+      h('button',{className:'cal-nav-btn',onClick:prevMonth},'‹'),
+      h('div',{style:{textAlign:'center'}},
+        h('div',{className:'cal-month-label'},monthName.charAt(0).toUpperCase()+monthName.slice(1)),
+        trainedCount>0&&h('div',{style:{fontSize:11,color:'var(--accent)',fontWeight:600,marginTop:2}},trainedCount+' día'+(trainedCount!==1?'s':'')+' entrenado'+(trainedCount!==1?'s':''))
+      ),
+      h('button',{className:'cal-nav-btn',onClick:nextMonth,style:{opacity:atMaxMonth?.3:1,cursor:atMaxMonth?'default':'pointer'}},'›')
+    ),
+    h('div',{className:'cal-grid'},
+      ['L','M','X','J','V','S','D'].map(d=>h('div',{key:d,className:'cal-dow'},d)),
+      ...cells
+    ),
+    h('div',{className:'cal-legend'},
+      h('div',{className:'cal-legend-dot',style:{background:'var(--accent)'}}),
+      h('span',null,'Día entrenado'),
+      h('div',{className:'cal-legend-dot',style:{background:'transparent',boxShadow:'0 0 0 2px var(--accent2)'}}),
+      h('span',null,'Hoy')
     )
   );
 }
@@ -1224,6 +1457,9 @@ function StatsTab({sessions}){
   const totalVol=filtered.reduce((s,x)=>s+x.totalVolume,0);
   const totalCal=filtered.reduce((s,x)=>s+(x.calories||0),0);
   const totalCardio=filtered.reduce((s,x)=>s+(x.totalCardioMin||0),0);
+  const avgDurSecs=filtered.filter(s=>s.durationSecs>0).length>0
+    ?Math.round(filtered.filter(s=>s.durationSecs>0).reduce((t,s)=>t+(s.durationSecs||0),0)/filtered.filter(s=>s.durationSecs>0).length)
+    :0;
 
   function bucket(ss,i){
     if(period==='week'){const d=new Date(now);d.setDate(d.getDate()-(6-i));return ss.filter(s=>new Date(s.date).toDateString()===d.toDateString());}
@@ -1260,9 +1496,10 @@ function StatsTab({sessions}){
     h('div',{className:'psub'},'Evolución y rendimiento'),
     h('div',{className:'periodtabs'},['week','month','year'].map((p,i)=>h('button',{key:p,className:'pbtn'+(period===p?' active':''),onClick:()=>setPeriod(p)},['Semana','Mes','Año'][i]))),
     h('div',{className:'mgrid'},
-      [{l:'Sesiones',v:filtered.length,u:''},{l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},{l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},{l:'Cardio',v:totalCardio,u:'min'}]
+      [{l:'Sesiones',v:filtered.length,u:''},{l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},{l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},{l:'Duración media',v:avgDurSecs>0?fmtDuration(avgDurSecs):'—',u:''}]
         .map(m=>h('div',{key:m.l,className:'mcard'},h('div',{className:'mlabel'},m.l),h('div',{className:'mval'},m.v,m.u&&h('span',{className:'unit'},' '+m.u))))
     ),
+    h(TrainingCalendar,{sessions}),
     h('div',{className:'card'},h('div',{className:'cardtitle'},'Volumen (kg)'),h(BarChart,{labels,data:volData,color:'#E24B4A'})),
     h('div',{className:'card'},h('div',{className:'cardtitle'},'Calorías (kcal)'),h(BarChart,{labels,data:calData,color:'#BA7517'})),
     exHistory.length>1&&h('div',{className:'card'},
