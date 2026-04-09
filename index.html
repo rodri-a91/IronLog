@@ -366,7 +366,7 @@ body{
 .cal-day.other-month{opacity:.28}
 .cal-day.trained{background:var(--accent);color:#fff;font-weight:700}
 .cal-day.today{box-shadow:0 0 0 2px var(--accent2);color:var(--accent2);font-weight:700}
-.cal-day.trained.today{background:var(--accent);color:#fff;box-shadow:0 0 0 2px var(--accent)}
+.cal-day.trained.today{background:var(--accent);color:#fff;box-shadow:0 0 0 2px var(--accent2)}
 .cal-day.trained::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.6)}
 .cal-legend{display:flex;align-items:center;gap:16px;margin-top:10px;font-size:11px;color:var(--t2)}
 .cal-legend-dot{width:12px;height:12px;border-radius:4px;flex-shrink:0}
@@ -1425,45 +1425,37 @@ function SessionDetail({session}){
         h('div',{className:'sds-val'},session.exercises.length),h('div',{className:'sds-label'},session.exercises.length===1?'ejercicio':'ejercicios')
       ),
     ),
-    // Strength exercises
-    strEx.length>0&&h('div',{className:'session-detail-exercises'},
-      strEx.map(ex=>h('div',{key:ex.id,className:'sde-row'},
+    // All exercises in original order
+    h('div',{className:'session-detail-exercises'},
+      session.exercises.map(ex=>h('div',{key:ex.id,className:'sde-row'},
         h('div',{className:'sde-header'},
           h('span',{className:'sde-name'},ex.name),
           h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle)
         ),
-        h('div',{className:'sde-sets'},
-          ex.sets.map((s,i)=>{
-            const w=parseFloat(s.weight)||0, r=parseInt(s.reps)||0;
-            if(!w&&!r)return null;
-            return h('div',{key:s.id||i,className:'sde-set'},
-              h('span',{className:'sde-set-num'},'#'+(i+1)),
-              h('span',{className:'sde-set-weight'},w?w+' kg':'—'),
-              h('span',{className:'sde-set-x'},'×'),
-              h('span',{className:'sde-set-reps'},r?r+' reps':'—'),
-              w&&r?h('span',{className:'sde-set-vol'},(w*r).toLocaleString('es-ES')+' kg'):null
-            );
-          }).filter(Boolean)
-        )
-      ))
-    ),
-    // Cardio exercises
-    cardioEx.length>0&&h('div',{className:'session-detail-exercises'},
-      cardioEx.map(ex=>h('div',{key:ex.id,className:'sde-row'},
-        h('div',{className:'sde-header'},
-          h('span',{className:'sde-name'},ex.name),
-          h('span',{className:'tag tb'},'Cardio')
-        ),
-        h('div',{className:'sde-sets'},
-          ex.sets.map((s,i)=>{
-            const d=parseFloat(s.duration)||0;
-            if(!d)return null;
-            return h('div',{key:s.id||i,className:'sde-set'},
-              h('span',{className:'sde-set-num'},'#'+(i+1)),
-              h('span',{className:'sde-set-weight'},d+' min')
-            );
-          }).filter(Boolean)
-        )
+        ex.isCardio
+          ? h('div',{className:'sde-sets'},
+              ex.sets.map((s,i)=>{
+                const d=parseFloat(s.duration)||0;
+                if(!d)return null;
+                return h('div',{key:s.id||i,className:'sde-set'},
+                  h('span',{className:'sde-set-num'},'#'+(i+1)),
+                  h('span',{className:'sde-set-weight'},d+' min')
+                );
+              }).filter(Boolean)
+            )
+          : h('div',{className:'sde-sets'},
+              ex.sets.map((s,i)=>{
+                const w=parseFloat(s.weight)||0, r=parseInt(s.reps)||0;
+                if(!w&&!r)return null;
+                return h('div',{key:s.id||i,className:'sde-set'},
+                  h('span',{className:'sde-set-num'},'#'+(i+1)),
+                  h('span',{className:'sde-set-weight'},w?w+' kg':'—'),
+                  h('span',{className:'sde-set-x'},'×'),
+                  h('span',{className:'sde-set-reps'},r?r+' reps':'—'),
+                  w&&r?h('span',{className:'sde-set-vol'},(w*r).toLocaleString('es-ES')+' kg'):null
+                );
+              }).filter(Boolean)
+            )
       ))
     )
   );
@@ -1655,7 +1647,7 @@ function StatsTab({sessions}){
       exList.map(e=>h('div',{key:e.name,style:{marginBottom:14}},
         h('div',{className:'rowflex'},
           h('div',null,h('span',{style:{fontSize:13,fontWeight:600,color:'var(--t1)'}},e.name),' ',h('span',{className:`tag ${MUSCLE_COLORS[e.muscle]||'tb'}`},e.muscle)),
-          h('span',{style:{fontSize:13,fontWeight:600}},e.max+' kg')
+          h('span',{style:{fontSize:13,fontWeight:600,color:'var(--t1)'}},e.max+' kg')
         ),
         h('div',{className:'pbar'},h('div',{className:'pbarf',style:{width:Math.round((e.max/maxW)*100)+'%'}}))
       ))
