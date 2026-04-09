@@ -209,7 +209,58 @@ body{
 .mval .unit{font-size:12px;color:var(--t2);font-weight:400}
 .chartw{position:relative;width:100%;height:200px}
 
-/* History */
+/* History cards */
+.hcard{background:var(--card);border:0.5px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;transition:border-color .2s}
+.hcard-open{border-color:var(--border2)}
+.hcard-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hcard-header:active{background:var(--bg2)}
+.hcard-left{flex:1;min-width:0}
+.hcard-date{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:6px}
+.hcard-meta{display:flex;gap:5px;flex-wrap:wrap}
+.hcard-chevron{color:var(--t2);flex-shrink:0;transition:transform .22s cubic-bezier(.2,.8,.4,1)}
+
+/* Session detail */
+.session-detail-wrap{
+  display:grid;
+  grid-template-rows:0fr;
+  transition:grid-template-rows .32s cubic-bezier(.2,.8,.4,1);
+}
+.hcard-open .session-detail-wrap{
+  grid-template-rows:1fr;
+}
+.session-detail-wrap-inner{
+  overflow:hidden;
+}
+.session-detail{
+  padding:0 16px 16px;
+  border-top:0.5px solid var(--border);
+  opacity:0;
+  transform:translateY(-6px);
+  transition:opacity .25s .1s ease, transform .3s .08s cubic-bezier(.2,.8,.4,1);
+}
+.hcard-open .session-detail{
+  opacity:1;
+  transform:translateY(0);
+}
+.session-detail-stats{display:flex;gap:8px;padding:14px 0 12px;border-bottom:0.5px solid var(--border);margin-bottom:14px}
+.sds-item{flex:1;text-align:center;padding:10px 6px;background:var(--bg2);border-radius:10px}
+.sds-val{font-size:17px;font-weight:800;color:var(--t1);line-height:1;font-variant-numeric:tabular-nums}
+.sds-label{font-size:10px;color:var(--t2);margin-top:4px;font-weight:500;text-transform:uppercase;letter-spacing:.3px}
+
+.session-detail-exercises{display:flex;flex-direction:column;gap:12px}
+.sde-row{padding:12px 14px;background:var(--bg2);border-radius:10px}
+.sde-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sde-name{font-size:14px;font-weight:600;color:var(--t1)}
+.sde-sets{display:flex;flex-direction:column;gap:5px}
+.sde-set{display:grid;grid-template-columns:20px 1fr auto auto 1fr;align-items:center;gap:6px;padding:5px 0;border-bottom:0.5px solid var(--border)}
+.sde-set:last-child{border-bottom:none}
+.sde-set-num{font-size:11px;color:var(--t2);font-weight:600}
+.sde-set-weight{font-size:14px;font-weight:600;color:var(--t1)}
+.sde-set-x{font-size:11px;color:var(--t2)}
+.sde-set-reps{font-size:14px;color:var(--t1)}
+.sde-set-vol{font-size:11px;color:var(--t2);text-align:right}
+
+/* old hentry kept for compat */
 .hentry{padding:13px 0;border-bottom:0.5px solid var(--border)}
 .hentry:last-child{border-bottom:none}
 .hdate{font-size:12px;color:var(--t2);font-weight:500}
@@ -302,7 +353,9 @@ body{
 .timer-display{font-size:22px;font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums;letter-spacing:1px;flex:1}
 .timer-label{font-size:11px;color:var(--t2);font-weight:500}
 
-/* Training Calendar */
+/* Active session indicator on nav */
+.navbtn-wrap{position:relative;flex:1;display:flex;flex-direction:column;align-items:center}
+.navbtn-dot{position:absolute;top:8px;right:calc(50% - 16px);width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--card);animation:timerPulse 1.4s ease-in-out infinite}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .cal-nav-btn{width:32px;height:32px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;color:var(--t1);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
 .cal-nav-btn:active{background:var(--bg2)}
@@ -1243,7 +1296,7 @@ function fmtDuration(secs){
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary}){
+function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary,onActiveSessionChange}){
   const [exercises,setExercises]=useState([]);
   const [showNewEx,setShowNewEx]=useState(false);
   const [newExName,setNewExName]=useState('');
@@ -1253,6 +1306,9 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   const timerRef=useRef();
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
   const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
+
+  // Notify App whether there's an active session
+  useEffect(()=>{onActiveSessionChange&&onActiveSessionChange(exercises.length>0);},[exercises.length]);
 
   // Start timer on first exercise
   useEffect(()=>{
@@ -1350,26 +1406,109 @@ function LibraryTab({library,sessions,onAdd,onRemove}){
 }
 
 // ---- History Tab ----
+function SessionDetail({session}){
+  const strEx=session.exercises.filter(e=>!e.isCardio);
+  const cardioEx=session.exercises.filter(e=>e.isCardio);
+  return h('div',{className:'session-detail'},
+    // Stats strip
+    h('div',{className:'session-detail-stats'},
+      session.durationSecs>0&&h('div',{className:'sds-item'},
+        h('div',{className:'sds-val'},fmtDuration(session.durationSecs)),h('div',{className:'sds-label'},'Duración')
+      ),
+      session.calories>0&&h('div',{className:'sds-item'},
+        h('div',{className:'sds-val'},session.calories),h('div',{className:'sds-label'},'kcal')
+      ),
+      session.totalVolume>0&&h('div',{className:'sds-item'},
+        h('div',{className:'sds-val'},Math.round(session.totalVolume/1000*10)/10+'k'),h('div',{className:'sds-label'},'kg vol.')
+      ),
+      session.exercises.length>0&&h('div',{className:'sds-item'},
+        h('div',{className:'sds-val'},session.exercises.length),h('div',{className:'sds-label'},session.exercises.length===1?'ejercicio':'ejercicios')
+      ),
+    ),
+    // Strength exercises
+    strEx.length>0&&h('div',{className:'session-detail-exercises'},
+      strEx.map(ex=>h('div',{key:ex.id,className:'sde-row'},
+        h('div',{className:'sde-header'},
+          h('span',{className:'sde-name'},ex.name),
+          h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle)
+        ),
+        h('div',{className:'sde-sets'},
+          ex.sets.map((s,i)=>{
+            const w=parseFloat(s.weight)||0, r=parseInt(s.reps)||0;
+            if(!w&&!r)return null;
+            return h('div',{key:s.id||i,className:'sde-set'},
+              h('span',{className:'sde-set-num'},'#'+(i+1)),
+              h('span',{className:'sde-set-weight'},w?w+' kg':'—'),
+              h('span',{className:'sde-set-x'},'×'),
+              h('span',{className:'sde-set-reps'},r?r+' reps':'—'),
+              w&&r?h('span',{className:'sde-set-vol'},(w*r).toLocaleString('es-ES')+' kg'):null
+            );
+          }).filter(Boolean)
+        )
+      ))
+    ),
+    // Cardio exercises
+    cardioEx.length>0&&h('div',{className:'session-detail-exercises'},
+      cardioEx.map(ex=>h('div',{key:ex.id,className:'sde-row'},
+        h('div',{className:'sde-header'},
+          h('span',{className:'sde-name'},ex.name),
+          h('span',{className:'tag tb'},'Cardio')
+        ),
+        h('div',{className:'sde-sets'},
+          ex.sets.map((s,i)=>{
+            const d=parseFloat(s.duration)||0;
+            if(!d)return null;
+            return h('div',{key:s.id||i,className:'sde-set'},
+              h('span',{className:'sde-set-num'},'#'+(i+1)),
+              h('span',{className:'sde-set-weight'},d+' min')
+            );
+          }).filter(Boolean)
+        )
+      ))
+    )
+  );
+}
+
 function HistoryTab({sessions}){
+  const [openId,setOpenId]=useState(null);
+  function toggle(id){setOpenId(prev=>prev===id?null:id);}
+
   return h('div',{className:'content'},
     h('div',{className:'ptitle'},'HISTORIAL'),
     h('div',{className:'psub'},'Todas tus sesiones'),
-    h('div',{className:'card'},
-      sessions.length===0?h('div',{className:'empty'},h('div',{className:'empty-icon'},'📋'),h('div',null,'No hay sesiones todavía')):
-      sessions.map(s=>{
-        const strEx=s.exercises.filter(e=>!e.isCardio),cardioEx=s.exercises.filter(e=>e.isCardio);
-        return h('div',{key:s.id,className:'hentry'},
-          h('div',{className:'hdate'},fmtDate(s.date)),
-          h('div',{className:'hmeta'},
-            strEx.length>0&&h('span',{className:'sbadge'},strEx.length+' ejercicios'),
-            s.totalVolume>0&&h('span',{className:'sbadge'},Math.round(s.totalVolume).toLocaleString('es-ES')+' kg'),
-            s.durationSecs>0&&h('span',{className:'sbadge'},'⏱ '+fmtDuration(s.durationSecs)),
-            cardioEx.length>0&&h('span',{className:'sbadge'},'🏃 '+s.totalCardioMin+' min'),
-            s.calories>0&&h('span',{className:'sbadge sbadge-cal'},'🔥 '+s.calories+' kcal')
-          )
-        );
-      })
-    )
+    sessions.length===0
+      ? h('div',{className:'card'},h('div',{className:'empty'},h('div',{className:'empty-icon'},'📋'),h('div',null,'No hay sesiones todavía')))
+      : sessions.map(s=>{
+          const isOpen=openId===s.id;
+          const strEx=s.exercises.filter(e=>!e.isCardio);
+          const cardioEx=s.exercises.filter(e=>e.isCardio);
+          return h('div',{key:s.id,className:'hcard'+(isOpen?' hcard-open':'')},
+            // Clickable header row
+            h('div',{className:'hcard-header',onClick:()=>toggle(s.id)},
+              h('div',{className:'hcard-left'},
+                h('div',{className:'hcard-date'},fmtDate(s.date)),
+                h('div',{className:'hcard-meta'},
+                  strEx.length>0&&h('span',{className:'sbadge'},strEx.length+' ejercicios'),
+                  s.totalVolume>0&&h('span',{className:'sbadge'},Math.round(s.totalVolume).toLocaleString('es-ES')+' kg'),
+                  s.durationSecs>0&&h('span',{className:'sbadge'},'⏱ '+fmtDuration(s.durationSecs)),
+                  cardioEx.length>0&&h('span',{className:'sbadge'},'🏃 '+s.totalCardioMin+' min'),
+                  s.calories>0&&h('span',{className:'sbadge sbadge-cal'},'🔥 '+s.calories+' kcal')
+                )
+              ),
+              h('div',{className:'hcard-chevron',style:{transform:isOpen?'rotate(180deg)':'rotate(0deg)'}},
+                h('svg',{viewBox:'0 0 24 24',width:16,height:16,fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round'},
+                  h('path',{d:'M6 9l6 6 6-6'})
+                )
+              )
+            ),
+            // Expandable detail — always rendered, animated with grid-template-rows
+            h('div',{className:'session-detail-wrap'},
+              h('div',{className:'session-detail-wrap-inner'},
+                h(SessionDetail,{session:s})
+              )
+            )
+          );
+        })
   );
 }
 
@@ -1654,6 +1793,7 @@ function App(){
   const [library,setLibrary]=useState(()=>loadState('il_library',DEFAULT_LIBRARY));
   const [profile,setProfile]=useState(()=>loadState('il_profile',{name:'',sex:'',dob:''}));
   const [weightLog,setWeightLog]=useState(()=>loadState('il_weightlog',[]));
+  const [hasActiveSession,setHasActiveSession]=useState(false);
 
   useEffect(()=>saveState('il_sessions',sessions),[sessions]);
   useEffect(()=>saveState('il_library',library),[library]);
@@ -1673,7 +1813,7 @@ function App(){
   }
 
   const TABS=[
-    {id:'workout', label:'Hoy',      Icon:Icons.workout},
+    {id:'workout', label:'Hoy',       Icon:Icons.workout},
     {id:'library', label:'Ejercicios',Icon:Icons.library},
     {id:'history', label:'Historial', Icon:Icons.history},
     {id:'stats',   label:'Stats',     Icon:Icons.stats},
@@ -1687,16 +1827,26 @@ function App(){
       h('div',{className:'datebadge'},today())
     ),
     h('div',{className:'nav'},
-      TABS.map(t=>h('button',{key:t.id,className:'navbtn'+(tab===t.id?' active':''),onClick:()=>setTab(t.id)},
-        h(t.Icon),h('span',null,t.label)
+      TABS.map(t=>h('div',{key:t.id,className:'navbtn-wrap'},
+        h('button',{className:'navbtn'+(tab===t.id?' active':''),onClick:()=>setTab(t.id),style:{width:'100%'}},
+          h(t.Icon),h('span',null,t.label)
+        ),
+        t.id==='workout'&&hasActiveSession&&tab!=='workout'&&h('div',{className:'navbtn-dot'})
       ))
     ),
-    tab==='workout' &&h(WorkoutTab,{sessions,library,onSave:addSession,profile,weightLog,onGoToProfile:()=>setTab('profile'),onAddToLibrary:addToLibrary}),
-    tab==='library' &&h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary}),
-    tab==='history' &&h(HistoryTab,{sessions}),
-    tab==='stats'   &&h(StatsTab,{sessions}),
-    tab==='profile' &&h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions}),
-    tab==='backup'  &&h(BackupTab,{sessions,library,profile,weightLog,onRestore:restoreBackup})
+    // All tabs stay mounted — only active one is visible.
+    h('div',{style:{display:tab==='workout'?'block':'none'}},
+      h(WorkoutTab,{sessions,library,onSave:addSession,profile,weightLog,onGoToProfile:()=>setTab('profile'),onAddToLibrary:addToLibrary,onActiveSessionChange:setHasActiveSession})),
+    h('div',{style:{display:tab==='library'?'block':'none'}},
+      h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary})),
+    h('div',{style:{display:tab==='history'?'block':'none'}},
+      h(HistoryTab,{sessions})),
+    h('div',{style:{display:tab==='stats'?'block':'none'}},
+      h(StatsTab,{sessions})),
+    h('div',{style:{display:tab==='profile'?'block':'none'}},
+      h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions})),
+    h('div',{style:{display:tab==='backup'?'block':'none'}},
+      h(BackupTab,{sessions,library,profile,weightLog,onRestore:restoreBackup}))
   );
 }
 
