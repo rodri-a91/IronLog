@@ -610,12 +610,18 @@ function NewExerciseModal({initialName,onSave,onClose}){
 }
 
 // ---- Exercise Block ----
-function ExerciseBlock({ex,onChange,onRemove,bw}){
+function ExerciseBlock({ex,onChange,onRemove,bw,prevSets=[]}){
   const isCardio=ex.isCardio;
   const estCal=bw>0?(isCardio?estimateCardioCals(ex,bw):estimateStrengthCals(ex,bw)):null;
   function updSet(i,f,v){const ns=[...ex.sets];ns[i]={...ns[i],[f]:v};onChange({...ex,sets:ns});}
-  function addSet(){const l=ex.sets[ex.sets.length-1]||{};onChange({...ex,sets:[...ex.sets,isCardio?{id:Date.now(),duration:''}:{id:Date.now(),reps:l.reps||'',weight:l.weight||''}]});}
+  function addSet(){
+    const l=ex.sets[ex.sets.length-1]||{};
+    onChange({...ex,sets:[...ex.sets,isCardio?{id:Date.now(),duration:''}:{id:Date.now(),reps:l.reps||'',weight:l.weight||''}]});
+  }
   function remSet(i){if(ex.sets.length===1)return;onChange({...ex,sets:ex.sets.filter((_,j)=>j!==i)});}
+
+  const hasPrev=!isCardio&&prevSets.length>0;
+
   return h('div',{className:'exblock'},
     h('div',{className:'exblock-header'},
       h('div',null,
@@ -629,7 +635,9 @@ function ExerciseBlock({ex,onChange,onRemove,bw}){
           h('div',{className:'series-header cardio'},h('div',{className:'series-num'},'#'),h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600}},'Duración (min)'),h('div',null)),
           ex.sets.map((s,i)=>h('div',{key:s.id,className:'series-row cardio'},
             h('div',{className:'series-num'},'#'+(i+1)),
-            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:1,placeholder:'30',value:s.duration,onChange:e=>updSet(i,'duration',e.target.value)}),
+            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:1,
+              placeholder:prevSets[i]?.duration||'30',
+              value:s.duration,onChange:e=>updSet(i,'duration',e.target.value)}),
             ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null)
           )),
           h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir intervalo')
@@ -641,12 +649,48 @@ function ExerciseBlock({ex,onChange,onRemove,bw}){
             h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'}},'Reps'),
             h('div',null)
           ),
-          ex.sets.map((s,i)=>h('div',{key:s.id,className:'series-row strength'},
-            h('div',{className:'series-num'},'#'+(i+1)),
-            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.5,placeholder:'kg',value:s.weight,onChange:e=>updSet(i,'weight',e.target.value)}),
-            h('input',{className:'series-input',type:'number',inputMode:'numeric',min:1,placeholder:'reps',value:s.reps,onChange:e=>updSet(i,'reps',e.target.value)}),
-            ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null)
-          )),
+          hasPrev&&h('div',{style:{
+            display:'grid',gridTemplateColumns:'28px 1fr 1fr 28px',gap:6,
+            marginBottom:4,padding:'3px 0',
+            borderBottom:'0.5px dashed var(--border)',
+          }},
+            h('div',null),
+            h('div',{style:{textAlign:'center',fontSize:10,color:'var(--t2)',fontStyle:'italic',opacity:.7}},
+              'anterior'
+            ),
+            h('div',{style:{textAlign:'center',fontSize:10,color:'var(--t2)',fontStyle:'italic',opacity:.7}},
+              'anterior'
+            ),
+            h('div',null)
+          ),
+          ex.sets.map((s,i)=>{
+            const prev=prevSets[i]||{};
+            const pwPlaceholder=prev.weight?String(prev.weight):'kg';
+            const prPlaceholder=prev.reps?String(prev.reps):'reps';
+            return h('div',{key:s.id,className:'series-row strength',style:{position:'relative'}},
+              h('div',{className:'series-num'},'#'+(i+1)),
+              h('div',{style:{position:'relative'}},
+                // Ghost value shown when input is empty
+                !s.weight&&prev.weight&&h('div',{style:{
+                  position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:14,color:'var(--t2)',opacity:.38,pointerEvents:'none',fontWeight:500,
+                }},prev.weight),
+                h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.5,
+                  placeholder:pwPlaceholder,value:s.weight,
+                  onChange:e=>updSet(i,'weight',e.target.value)})
+              ),
+              h('div',{style:{position:'relative'}},
+                !s.reps&&prev.reps&&h('div',{style:{
+                  position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:14,color:'var(--t2)',opacity:.38,pointerEvents:'none',fontWeight:500,
+                }},prev.reps),
+                h('input',{className:'series-input',type:'number',inputMode:'numeric',min:1,
+                  placeholder:prPlaceholder,value:s.reps,
+                  onChange:e=>updSet(i,'reps',e.target.value)})
+              ),
+              ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null)
+            );
+          }),
           h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir serie')
         )
   );
@@ -1296,16 +1340,43 @@ function fmtDuration(secs){
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
+const DRAFT_KEY='il_draft';
+
 function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary,onActiveSessionChange}){
-  const [exercises,setExercises]=useState([]);
+  const [exercises,setExercises]=useState(()=>{
+    // Restore draft on mount if one exists
+    try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return d?.exercises||[];}catch{return[];}
+  });
+  const [timerStart,setTimerStart]=useState(()=>{
+    try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return d?.timerStart||null;}catch{return null;}
+  });
   const [showNewEx,setShowNewEx]=useState(false);
   const [newExName,setNewExName]=useState('');
   const [completedSession,setCompletedSession]=useState(null);
-  const [timerStart,setTimerStart]=useState(null);
-  const [elapsed,setElapsed]=useState(0);
+  const [elapsed,setElapsed]=useState(timerStart?Math.floor((Date.now()-timerStart)/1000):0);
+  const [draftBanner,setDraftBanner]=useState(()=>{
+    try{
+      const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
+      if(d?.exercises?.length>0){
+        const date=d.savedAt?new Date(d.savedAt).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):null;
+        return date;
+      }
+    }catch{}
+    return null;
+  });
+  const bottomRef=useRef();
   const timerRef=useRef();
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
   const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
+
+  // Autosave draft whenever exercises or timerStart change
+  useEffect(()=>{
+    if(exercises.length>0){
+      saveState(DRAFT_KEY,{exercises,timerStart,savedAt:new Date().toISOString()});
+    } else {
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  },[exercises,timerStart]);
 
   // Notify App whether there's an active session
   useEffect(()=>{onActiveSessionChange&&onActiveSessionChange(exercises.length>0);},[exercises.length]);
@@ -1331,10 +1402,19 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   },[timerStart]);
 
   function selectFromLibrary(libEx){
+    setDraftBanner(null);
     setExercises(prev=>[...prev,{id:Date.now(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
       sets:libEx.isCardio?[{id:Date.now(),duration:''}]:[{id:Date.now(),reps:'',weight:''}]}]);
+    // Scroll to bottom after render
+    setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth',block:'end'}),80);
   }
   function saveNewToLibrary(libEx){onAddToLibrary(libEx);selectFromLibrary(libEx);}
+  function discardSession(){
+    clearInterval(timerRef.current);
+    setExercises([]);setTimerStart(null);setElapsed(0);
+    setDraftBanner(null);
+    localStorage.removeItem(DRAFT_KEY);
+  }
   function save(){
     if(!exercises.length){alert('Añade al menos un ejercicio');return;}
     clearInterval(timerRef.current);
@@ -1345,6 +1425,8 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     const session={id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,calories:cal,durationSecs};
     onSave(session);
     setExercises([]);setTimerStart(null);setElapsed(0);
+    setDraftBanner(null);
+    localStorage.removeItem(DRAFT_KEY);
     setCompletedSession(session);
   }
   return h('div',{className:'content'},
@@ -1353,6 +1435,18 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     h('div',{className:'ptitle'},'HOY'),
     h('div',{className:'psub'},new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})),
     h(ProfileBanner,{profile,weightLog,onGoToProfile}),
+    // Draft recovery banner
+    draftBanner&&exercises.length>0&&h('div',{style:{
+      display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,
+      padding:'10px 14px',background:'#E6F1FB',border:'0.5px solid #378ADD',
+      borderRadius:10,marginBottom:12,fontSize:13,
+    }},
+      h('span',{style:{color:'#185FA5',fontWeight:500}},'📋 Borrador recuperado del '+draftBanner),
+      h('button',{onClick:discardSession,style:{
+        background:'transparent',border:'none',color:'#185FA5',cursor:'pointer',
+        fontFamily:'inherit',fontSize:12,fontWeight:600,padding:0,textDecoration:'underline',
+      }},'Descartar')
+    ),
     timerStart&&h('div',{className:'workout-timer'},
       h('div',{className:'timer-dot'}),
       h('div',{className:'timer-display'},fmtDuration(elapsed)),
@@ -1367,12 +1461,17 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     ),
     exercises.length>0&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},'Esta sesión ('+(exercises.length)+')'),
-      exercises.map((e,i)=>h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>setExercises(prev=>prev.filter((_,j)=>j!==i)),bw:currentWeight}))
+      exercises.map((e,i)=>{
+        const prevSession=sessions.find(s=>s.exercises.some(x=>x.name===e.name));
+        const prevSets=prevSession?prevSession.exercises.find(x=>x.name===e.name)?.sets||[]:[];
+        return h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>setExercises(prev=>prev.filter((_,j)=>j!==i)),bw:currentWeight,prevSets});
+      })
     ),
     h('div',{style:{display:'flex',gap:10}},
       h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar sesión'),
-      exercises.length>0&&h('button',{className:'btn btns',onClick:()=>{clearInterval(timerRef.current);setExercises([]);setTimerStart(null);setElapsed(0);}},'Descartar')
-    )
+      exercises.length>0&&h('button',{className:'btn btns',onClick:discardSession},'Descartar')
+    ),
+    h('div',{ref:bottomRef})
   );
 }
 
