@@ -1417,7 +1417,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   }
   function save(){
     if(!exercises.length){alert('Añade al menos un ejercicio');return;}
-    clearInterval(timerRef.current);
+    if(!confirm('¿Terminar y guardar la sesión?'))return;
     const durationSecs=timerStart?Math.floor((Date.now()-timerStart)/1000):0;
     const cal=currentWeight>0?calcSessionCals(exercises,currentWeight):0;
     const vol=exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
