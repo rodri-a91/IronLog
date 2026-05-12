@@ -1476,30 +1476,75 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
 }
 
 // ---- Library Tab ----
-function LibraryTab({library,sessions,onAdd,onRemove}){
+function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
   const [filter,setFilter]=useState('Todos');
   const [showModal,setShowModal]=useState(false);
+  const [editingEx,setEditingEx]=useState(null); // {id, name, muscle}
   const usageMap=useMemo(()=>{const m={};sessions.forEach(s=>s.exercises.forEach(e=>{if(e.libraryId)m[e.libraryId]=(m[e.libraryId]||0)+1;}));return m;},[sessions]);
   const filtered=filter==='Todos'?library:library.filter(e=>e.muscle===filter);
-  const isDefault=id=>DEFAULT_LIBRARY.some(e=>e.id===id);
+
+  function saveEdit(){
+    if(!editingEx.name.trim()){alert('El nombre no puede estar vacío');return;}
+    onEdit(editingEx);
+    setEditingEx(null);
+  }
+
   return h('div',{className:'content'},
     showModal&&h(NewExerciseModal,{initialName:'',onSave:ex=>{onAdd(ex);setShowModal(false);},onClose:()=>setShowModal(false)}),
-    h('div',{className:'ptitle'},'BIBLIOTECA'),
-    h('div',{className:'psub'},library.length+' ejercicios disponibles'),
-    h('div',{style:{display:'flex',justifyContent:'flex-end',marginBottom:12}},h('button',{className:'btn btnp btnsm',onClick:()=>setShowModal(true)},'+ Nuevo ejercicio')),
-    h('div',{className:'lib-filter'},['Todos',...MUSCLES].map(m=>h('button',{key:m,className:'lib-filter-btn'+(filter===m?' active':''),onClick:()=>setFilter(m)},m))),
-    h('div',{className:'card'},
-      filtered.length===0?h('div',{className:'empty'},h('div',{className:'empty-icon'},'🔍'),h('div',null,'Sin ejercicios en este grupo')):
-      filtered.map(ex=>h('div',{key:ex.id,className:'lib-ex-row'},
-        h('div',null,
-          h('div',{className:'lib-ex-name'},ex.name),
-          h('div',{style:{display:'flex',gap:6,marginTop:4,alignItems:'center'}},
-            h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle),
-            usageMap[ex.id]&&h('span',{style:{fontSize:11,color:'var(--t2)'}},usageMap[ex.id]+' '+(usageMap[ex.id]===1?'vez':'veces'))
+
+    // Edit modal
+    editingEx&&h('div',{className:'overlay',onClick:e=>{if(e.target===e.currentTarget)setEditingEx(null)}},
+      h('div',{className:'modal'},
+        h('div',{className:'modal-handle'}),
+        h('div',{className:'modaltitle'},'Editar ejercicio'),
+        h('div',{style:{fontSize:12,color:'var(--t2)',background:'var(--bg2)',borderRadius:8,padding:'8px 12px',marginBottom:14,lineHeight:1.5}},
+          '⚠ Cambiar el nombre o la categoría solo afecta a futuras sesiones. Las sesiones ya registradas conservan sus datos originales.'
+        ),
+        h('div',{className:'fg'},
+          h('label',null,'Nombre'),
+          h('input',{value:editingEx.name,onChange:e=>setEditingEx({...editingEx,name:e.target.value}),autoFocus:true})
+        ),
+        h('div',{className:'fg'},
+          h('label',null,'Grupo muscular'),
+          h('select',{value:editingEx.muscle,onChange:e=>setEditingEx({...editingEx,muscle:e.target.value,isCardio:e.target.value==='Cardio'})},
+            MUSCLES.map(m=>h('option',{key:m},m))
           )
         ),
-        !isDefault(ex.id)&&h('button',{className:'btnd',onClick:()=>onRemove(ex.id)},'Eliminar')
-      ))
+        h('div',{style:{display:'flex',gap:8,marginTop:8}},
+          h('button',{className:'btn btnp',style:{flex:1},onClick:saveEdit},'Guardar cambios'),
+          h('button',{className:'btn btns',onClick:()=>setEditingEx(null)},'Cancelar')
+        )
+      )
+    ),
+
+    h('div',{className:'ptitle'},'BIBLIOTECA'),
+    h('div',{className:'psub'},library.length+' ejercicios disponibles'),
+    h('div',{style:{display:'flex',justifyContent:'flex-end',marginBottom:12}},
+      h('button',{className:'btn btnp btnsm',onClick:()=>setShowModal(true)},'+ Nuevo ejercicio')
+    ),
+    h('div',{className:'lib-filter'},['Todos',...MUSCLES].map(m=>
+      h('button',{key:m,className:'lib-filter-btn'+(filter===m?' active':''),onClick:()=>setFilter(m)},m)
+    )),
+    h('div',{className:'card'},
+      filtered.length===0
+        ? h('div',{className:'empty'},h('div',{className:'empty-icon'},'🔍'),h('div',null,'Sin ejercicios en este grupo'))
+        : filtered.map(ex=>h('div',{key:ex.id,className:'lib-ex-row'},
+            h('div',{style:{flex:1,minWidth:0}},
+              h('div',{className:'lib-ex-name'},ex.name),
+              h('div',{style:{display:'flex',gap:6,marginTop:4,alignItems:'center'}},
+                h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle),
+                usageMap[ex.id]&&h('span',{style:{fontSize:11,color:'var(--t2)'}},
+                  usageMap[ex.id]+' '+(usageMap[ex.id]===1?'vez':'veces'))
+              )
+            ),
+            h('div',{style:{display:'flex',gap:6,flexShrink:0}},
+              h('button',{
+                className:'btn btns btnsm',
+                onClick:()=>setEditingEx({id:ex.id,name:ex.name,muscle:ex.muscle,isCardio:ex.isCardio})
+              },'Editar'),
+              ex.id.startsWith('c-')&&h('button',{className:'btnd',onClick:()=>onRemove(ex.id)},'Eliminar')
+            )
+          ))
     )
   );
 }
@@ -1894,6 +1939,7 @@ function App(){
   function addSession(s){setSessions(prev=>[s,...prev]);}
   function addToLibrary(ex){setLibrary(prev=>[...prev,ex]);}
   function removeFromLibrary(id){setLibrary(prev=>prev.filter(e=>e.id!==id));}
+  function editLibrary(updated){setLibrary(prev=>prev.map(e=>e.id===updated.id?{...e,...updated}:e));}
   function addWeight(entry){setWeightLog(prev=>[...prev,entry].sort((a,b)=>new Date(a.date)-new Date(b.date)));}
   function removeWeight(id){setWeightLog(prev=>prev.filter(e=>e.id!==id));}
   function restoreBackup(data){
@@ -1929,7 +1975,7 @@ function App(){
     h('div',{style:{display:tab==='workout'?'block':'none'}},
       h(WorkoutTab,{sessions,library,onSave:addSession,profile,weightLog,onGoToProfile:()=>setTab('profile'),onAddToLibrary:addToLibrary,onActiveSessionChange:setHasActiveSession})),
     h('div',{style:{display:tab==='library'?'block':'none'}},
-      h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary})),
+      h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary,onEdit:editLibrary})),
     h('div',{style:{display:tab==='history'?'block':'none'}},
       h(HistoryTab,{sessions})),
     h('div',{style:{display:tab==='stats'?'block':'none'}},
