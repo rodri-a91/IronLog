@@ -1350,10 +1350,16 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   const [timerStart,setTimerStart]=useState(()=>{
     try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return d?.timerStart||null;}catch{return null;}
   });
+  const [lastActivity,setLastActivity]=useState(()=>{
+    try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return d?.lastActivity||Date.now();}catch{return Date.now();}
+  });
+  const [pausedAt,setPausedAt]=useState(()=>{
+    try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return d?.pausedAt||null;}catch{return null;}
+  });
   const [showNewEx,setShowNewEx]=useState(false);
   const [newExName,setNewExName]=useState('');
   const [completedSession,setCompletedSession]=useState(null);
-  const [elapsed,setElapsed]=useState(timerStart?Math.floor((Date.now()-timerStart)/1000):0);
+  const [elapsed,setElapsed]=useState(timerStart?Math.floor(((pausedAt||Date.now())-timerStart)/1000):0);
   const [draftBanner,setDraftBanner]=useState(()=>{
     try{
       const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
@@ -1366,40 +1372,68 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   });
   const bottomRef=useRef();
   const timerRef=useRef();
+  const firstRender=useRef(true);
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
   const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
 
-  // Autosave draft whenever exercises or timerStart change
+  const INACTIVITY_MS=15*60*1000;
+
+  // Autosave draft whenever relevant state changes
   useEffect(()=>{
     if(exercises.length>0){
-      saveState(DRAFT_KEY,{exercises,timerStart,savedAt:new Date().toISOString()});
+      saveState(DRAFT_KEY,{exercises,timerStart,lastActivity,pausedAt,savedAt:new Date().toISOString()});
     } else {
       localStorage.removeItem(DRAFT_KEY);
     }
-  },[exercises,timerStart]);
+  },[exercises,timerStart,lastActivity,pausedAt]);
 
   // Notify App whether there's an active session
   useEffect(()=>{onActiveSessionChange&&onActiveSessionChange(exercises.length>0);},[exercises.length]);
 
-  // Start timer on first exercise
+  // Start timer on first exercise / reset when emptied
   useEffect(()=>{
     if(exercises.length===1&&!timerStart){
       const start=Date.now();
-      setTimerStart(start);
-      setElapsed(0);
+      setTimerStart(start);setLastActivity(start);setPausedAt(null);setElapsed(0);
     }
     if(exercises.length===0){
       clearInterval(timerRef.current);
-      setTimerStart(null);setElapsed(0);
+      setTimerStart(null);setPausedAt(null);setElapsed(0);
     }
   },[exercises.length]);
 
-  // Tick every second
+  // Track activity & auto-resume on any change to exercises (skip first render)
+  useEffect(()=>{
+    if(firstRender.current){firstRender.current=false;return;}
+    if(exercises.length===0)return;
+    const now=Date.now();
+    setLastActivity(now);
+    if(pausedAt){
+      // Resume: shift timerStart forward by paused duration so elapsed continues smoothly
+      setTimerStart(ts=>ts+(now-pausedAt));
+      setPausedAt(null);
+    }
+  },[exercises]);
+
+  // Tick every second: update display + check inactivity threshold
   useEffect(()=>{
     if(!timerStart)return;
-    timerRef.current=setInterval(()=>setElapsed(Math.floor((Date.now()-timerStart)/1000)),1000);
+    timerRef.current=setInterval(()=>{
+      const now=Date.now();
+      if(!pausedAt&&now-lastActivity>INACTIVITY_MS){
+        const freeze=lastActivity+INACTIVITY_MS;
+        setPausedAt(freeze);
+        setElapsed(Math.floor((freeze-timerStart)/1000));
+        return;
+      }
+      if(pausedAt){
+        setElapsed(Math.floor((pausedAt-timerStart)/1000));
+      } else {
+        setElapsed(Math.floor((now-timerStart)/1000));
+      }
+    },1000);
     return()=>clearInterval(timerRef.current);
-  },[timerStart]);
+  },[timerStart,lastActivity,pausedAt]);
 
   function selectFromLibrary(libEx){
     setDraftBanner(null);
@@ -1411,20 +1445,22 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   function saveNewToLibrary(libEx){onAddToLibrary(libEx);selectFromLibrary(libEx);}
   function discardSession(){
     clearInterval(timerRef.current);
-    setExercises([]);setTimerStart(null);setElapsed(0);
+    setExercises([]);setTimerStart(null);setPausedAt(null);setElapsed(0);
     setDraftBanner(null);
     localStorage.removeItem(DRAFT_KEY);
   }
   function save(){
     if(!exercises.length){alert('Añade al menos un ejercicio');return;}
     if(!confirm('¿Terminar y guardar la sesión?'))return;
-    const durationSecs=timerStart?Math.floor((Date.now()-timerStart)/1000):0;
+    clearInterval(timerRef.current);
+    const realEnd=pausedAt||Date.now();
+    const durationSecs=timerStart?Math.floor((realEnd-timerStart)/1000):0;
     const cal=currentWeight>0?calcSessionCals(exercises,currentWeight):0;
     const vol=exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
     const cardioMin=exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
     const session={id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,calories:cal,durationSecs};
     onSave(session);
-    setExercises([]);setTimerStart(null);setElapsed(0);
+    setExercises([]);setTimerStart(null);setPausedAt(null);setElapsed(0);
     setDraftBanner(null);
     localStorage.removeItem(DRAFT_KEY);
     setCompletedSession(session);
@@ -1447,10 +1483,12 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
         fontFamily:'inherit',fontSize:12,fontWeight:600,padding:0,textDecoration:'underline',
       }},'Descartar')
     ),
-    timerStart&&h('div',{className:'workout-timer'},
-      h('div',{className:'timer-dot'}),
-      h('div',{className:'timer-display'},fmtDuration(elapsed)),
-      h('div',{className:'timer-label'},'Tiempo de sesión')
+    timerStart&&h('div',{className:'workout-timer',style:pausedAt?{borderColor:'#BA7517'}:{}},
+      pausedAt
+        ? h('div',{style:{width:8,height:8,borderRadius:'50%',background:'#BA7517',flexShrink:0}})
+        : h('div',{className:'timer-dot'}),
+      h('div',{className:'timer-display',style:pausedAt?{color:'#BA7517'}:{}},fmtDuration(elapsed)),
+      h('div',{className:'timer-label'},pausedAt?'Pausado por inactividad':'Tiempo de sesión')
     ),
     exercises.length>0&&estTotal!==null&&h('div',{className:'cal-preview'},
       h('div',null,h('div',{className:'kcal-num'},'🔥 '+estTotal+' kcal'),h('div',{className:'kcal-sub'},'estimadas esta sesión'),h('div',{className:'kcal-note'},'Se actualiza en tiempo real'))
