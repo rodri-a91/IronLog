@@ -174,7 +174,7 @@ body{
 .series-header{display:grid;gap:6px;font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px;align-items:center}
 .series-row{display:grid;gap:6px;align-items:center;margin-bottom:8px}
 .series-header.strength,.series-row.strength{grid-template-columns:28px 1fr 1fr 28px}
-.series-header.cardio,.series-row.cardio{grid-template-columns:28px 1fr 28px}
+.series-header.cardio,.series-row.cardio{grid-template-columns:28px 1fr 1fr 28px}
 .series-input{
   height:36px;border:0.5px solid var(--border2);border-radius:8px;
   padding:0 8px;font-size:16px;background:var(--bg2);color:var(--t1);
@@ -616,7 +616,7 @@ function ExerciseBlock({ex,onChange,onRemove,bw,prevSets=[]}){
   function updSet(i,f,v){const ns=[...ex.sets];ns[i]={...ns[i],[f]:v};onChange({...ex,sets:ns});}
   function addSet(){
     const l=ex.sets[ex.sets.length-1]||{};
-    onChange({...ex,sets:[...ex.sets,isCardio?{id:Date.now(),duration:''}:{id:Date.now(),reps:l.reps||'',weight:l.weight||''}]});
+    onChange({...ex,sets:[...ex.sets,isCardio?{id:Date.now(),duration:'',distance:''}:{id:Date.now(),reps:l.reps||'',weight:l.weight||''}]});
   }
   function remSet(i){if(ex.sets.length===1)return;onChange({...ex,sets:ex.sets.filter((_,j)=>j!==i)});}
 
@@ -632,12 +632,20 @@ function ExerciseBlock({ex,onChange,onRemove,bw,prevSets=[]}){
     ),
     isCardio
       ? h('div',null,
-          h('div',{className:'series-header cardio'},h('div',{className:'series-num'},'#'),h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600}},'Duración (min)'),h('div',null)),
+          h('div',{className:'series-header cardio'},
+            h('div',{className:'series-num'},'#'),
+            h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'}},'Duración (min)'),
+            h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'}},'Distancia (km)'),
+            h('div',null)
+          ),
           ex.sets.map((s,i)=>h('div',{key:s.id,className:'series-row cardio'},
             h('div',{className:'series-num'},'#'+(i+1)),
-            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:1,
+            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.1,
               placeholder:prevSets[i]?.duration||'30',
               value:s.duration,onChange:e=>updSet(i,'duration',e.target.value)}),
+            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.1,
+              placeholder:prevSets[i]?.distance||'km',
+              value:s.distance||'',onChange:e=>updSet(i,'distance',e.target.value)}),
             ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null)
           )),
           h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir intervalo')
@@ -1299,11 +1307,17 @@ function SessionCompleteModal({session,onClose}){
                 h('div',{className:'sc-stat-unit'},'series'),
                 h('div',{className:'sc-stat-label'},'Completadas')
               )
-            : h('div',{className:'sc-stat'},
-                h('div',{className:'sc-stat-val'},totalCardioMin),
-                h('div',{className:'sc-stat-unit'},'minutos'),
-                h('div',{className:'sc-stat-label'},'Cardio')
-              )
+            : session.totalCardioKm>0
+              ? h('div',{className:'sc-stat'},
+                  h('div',{className:'sc-stat-val'},Math.round(session.totalCardioKm*10)/10),
+                  h('div',{className:'sc-stat-unit'},'km recorridos'),
+                  h('div',{className:'sc-stat-label'},'Distancia')
+                )
+              : h('div',{className:'sc-stat'},
+                  h('div',{className:'sc-stat-val'},totalCardioMin),
+                  h('div',{className:'sc-stat-unit'},'minutos'),
+                  h('div',{className:'sc-stat-label'},'Cardio')
+                )
         ),
         session.totalVolume>0&&h('div',{style:{textAlign:'center',fontSize:13,color:'var(--t2)',marginBottom:20,marginTop:-6}},
           session.exercises.length+' ejercicios · ',h('strong',{style:{color:'var(--t1)'}},Math.round(session.totalVolume).toLocaleString('es-ES')+' kg vol.')
@@ -1438,7 +1452,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   function selectFromLibrary(libEx){
     setDraftBanner(null);
     setExercises(prev=>[...prev,{id:Date.now(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
-      sets:libEx.isCardio?[{id:Date.now(),duration:''}]:[{id:Date.now(),reps:'',weight:''}]}]);
+      sets:libEx.isCardio?[{id:Date.now(),duration:'',distance:''}]:[{id:Date.now(),reps:'',weight:''}]}]);
     // Scroll to bottom after render
     setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth',block:'end'}),80);
   }
@@ -1458,7 +1472,8 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     const cal=currentWeight>0?calcSessionCals(exercises,currentWeight):0;
     const vol=exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
     const cardioMin=exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
-    const session={id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,calories:cal,durationSecs};
+    const cardioKm=exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.distance)||0),0),0);
+    const session={id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,totalCardioKm:cardioKm,calories:cal,durationSecs};
     onSave(session);
     setExercises([]);setTimerStart(null);setPausedAt(null);setElapsed(0);
     setDraftBanner(null);
@@ -1618,10 +1633,14 @@ function SessionDetail({session}){
           ? h('div',{className:'sde-sets'},
               ex.sets.map((s,i)=>{
                 const d=parseFloat(s.duration)||0;
-                if(!d)return null;
+                const km=parseFloat(s.distance)||0;
+                if(!d&&!km)return null;
                 return h('div',{key:s.id||i,className:'sde-set'},
                   h('span',{className:'sde-set-num'},'#'+(i+1)),
-                  h('span',{className:'sde-set-weight'},d+' min')
+                  h('span',{className:'sde-set-weight'},d?d+' min':'—'),
+                  km>0?h('span',{className:'sde-set-x'},'·'):null,
+                  km>0?h('span',{className:'sde-set-reps'},km+' km'):null,
+                  d>0&&km>0?h('span',{className:'sde-set-vol'},(km/d*60).toFixed(1)+' km/h'):null
                 );
               }).filter(Boolean)
             )
@@ -1665,7 +1684,7 @@ function HistoryTab({sessions}){
                   strEx.length>0&&h('span',{className:'sbadge'},strEx.length+' ejercicios'),
                   s.totalVolume>0&&h('span',{className:'sbadge'},Math.round(s.totalVolume).toLocaleString('es-ES')+' kg'),
                   s.durationSecs>0&&h('span',{className:'sbadge'},'⏱ '+fmtDuration(s.durationSecs)),
-                  cardioEx.length>0&&h('span',{className:'sbadge'},'🏃 '+s.totalCardioMin+' min'),
+                  cardioEx.length>0&&h('span',{className:'sbadge'},'🏃 '+s.totalCardioMin+' min'+(s.totalCardioKm>0?' · '+(Math.round(s.totalCardioKm*10)/10)+' km':'')),
                   s.calories>0&&h('span',{className:'sbadge sbadge-cal'},'🔥 '+s.calories+' kcal')
                 )
               ),
@@ -1770,6 +1789,7 @@ function StatsTab({sessions}){
   const totalVol=filtered.reduce((s,x)=>s+x.totalVolume,0);
   const totalCal=filtered.reduce((s,x)=>s+(x.calories||0),0);
   const totalCardio=filtered.reduce((s,x)=>s+(x.totalCardioMin||0),0);
+  const totalKm=filtered.reduce((s,x)=>s+(x.totalCardioKm||0),0);
   const avgDurSecs=filtered.filter(s=>s.durationSecs>0).length>0
     ?Math.round(filtered.filter(s=>s.durationSecs>0).reduce((t,s)=>t+(s.durationSecs||0),0)/filtered.filter(s=>s.durationSecs>0).length)
     :0;
@@ -1809,7 +1829,9 @@ function StatsTab({sessions}){
     h('div',{className:'psub'},'Evolución y rendimiento'),
     h('div',{className:'periodtabs'},['week','month','year'].map((p,i)=>h('button',{key:p,className:'pbtn'+(period===p?' active':''),onClick:()=>setPeriod(p)},['Semana','Mes','Año'][i]))),
     h('div',{className:'mgrid'},
-      [{l:'Sesiones',v:filtered.length,u:''},{l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},{l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},{l:'Duración media',v:avgDurSecs>0?fmtDuration(avgDurSecs):'—',u:''}]
+      (totalKm>0?
+        [{l:'Sesiones',v:filtered.length,u:''},{l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},{l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},{l:'Cardio',v:Math.round(totalKm*10)/10,u:'km'},{l:'Duración media',v:avgDurSecs>0?fmtDuration(avgDurSecs):'—',u:''},{l:'Tiempo cardio',v:totalCardio,u:'min'}]
+        :[{l:'Sesiones',v:filtered.length,u:''},{l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},{l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},{l:'Duración media',v:avgDurSecs>0?fmtDuration(avgDurSecs):'—',u:''}])
         .map(m=>h('div',{key:m.l,className:'mcard'},h('div',{className:'mlabel'},m.l),h('div',{className:'mval'},m.v,m.u&&h('span',{className:'unit'},' '+m.u))))
     ),
     h(TrainingCalendar,{sessions}),
