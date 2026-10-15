@@ -361,7 +361,8 @@ body{
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .cal-dow{font-size:10px;font-weight:600;color:var(--t2);text-align:center;padding:4px 0;text-transform:uppercase;letter-spacing:.3px}
 .cal-day{aspect-ratio:1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--t2);position:relative;cursor:default}
-.cal-day.other-month{opacity:.28}
+.cal-day.other-month{opacity:.5}
+.cal-day.trained.other-month{opacity:.6}
 .cal-day.trained{background:var(--accent);color:#fff;font-weight:700}
 .cal-day.today{box-shadow:0 0 0 2px var(--accent2);color:var(--accent2);font-weight:700}
 .cal-day.trained.today{background:var(--accent);color:#fff;box-shadow:0 0 0 2px var(--accent2)}
@@ -451,13 +452,13 @@ const MUSCLE_COLORS={Pecho:'tr',Espalda:'tb',Piernas:'tg',Hombros:'ta',Bíceps:'
 const MUSCLE_MET={Pecho:4.0,Espalda:4.2,Piernas:5.0,Hombros:3.8,Bíceps:3.5,Tríceps:3.5,Core:3.8,Glúteos:4.5};
 
 const DEFAULT_LIBRARY=[
-  {id:'press-banca',name:'Press banca',muscle:'Pecho',isCardio:false},
+  {id:'press-banca',name:'Press de banca',muscle:'Pecho',isCardio:false},
   {id:'press-inclinado',name:'Press inclinado',muscle:'Pecho',isCardio:false},
-  {id:'aperturas',name:'Aperturas con mancuernas',muscle:'Pecho',isCardio:false},
-  {id:'fondos',name:'Fondos en paralelas',muscle:'Pecho',isCardio:false},
-  {id:'jalones',name:'Jalones al pecho',muscle:'Espalda',isCardio:false},
+  {id:'aperturas',name:'Apertura con mancuernas',muscle:'Pecho',isCardio:false},
+  {id:'fondos',name:'Fondo en paralelas',muscle:'Pecho',isCardio:false},
+  {id:'jalones',name:'Jalón al pecho',muscle:'Espalda',isCardio:false},
   {id:'remo-barra',name:'Remo con barra',muscle:'Espalda',isCardio:false},
-  {id:'dominadas',name:'Dominadas',muscle:'Espalda',isCardio:false},
+  {id:'dominadas',name:'Dominada',muscle:'Espalda',isCardio:false},
   {id:'remo-polea',name:'Remo en polea',muscle:'Espalda',isCardio:false},
   {id:'sentadilla',name:'Sentadilla',muscle:'Piernas',isCardio:false},
   {id:'prensa',name:'Prensa de piernas',muscle:'Piernas',isCardio:false},
@@ -465,12 +466,12 @@ const DEFAULT_LIBRARY=[
   {id:'extension-cuad',name:'Extensión de cuádriceps',muscle:'Piernas',isCardio:false},
   {id:'curl-femoral',name:'Curl femoral',muscle:'Piernas',isCardio:false},
   {id:'press-militar',name:'Press militar',muscle:'Hombros',isCardio:false},
-  {id:'elevaciones-lat',name:'Elevaciones laterales',muscle:'Hombros',isCardio:false},
+  {id:'elevaciones-lat',name:'Elevación lateral',muscle:'Hombros',isCardio:false},
   {id:'pajaro',name:'Pájaro con mancuernas',muscle:'Hombros',isCardio:false},
   {id:'curl-biceps',name:'Curl de bíceps',muscle:'Bíceps',isCardio:false},
   {id:'curl-martillo',name:'Curl martillo',muscle:'Bíceps',isCardio:false},
   {id:'press-frances',name:'Press francés',muscle:'Tríceps',isCardio:false},
-  {id:'extension-triceps',name:'Extensión tríceps polea',muscle:'Tríceps',isCardio:false},
+  {id:'extension-triceps',name:'Extensión de tríceps en polea',muscle:'Tríceps',isCardio:false},
   {id:'crunch',name:'Crunch abdominal',muscle:'Core',isCardio:false},
   {id:'plancha',name:'Plancha',muscle:'Core',isCardio:false},
   {id:'hip-thrust',name:'Hip thrust',muscle:'Glúteos',isCardio:false},
@@ -478,9 +479,46 @@ const DEFAULT_LIBRARY=[
   {id:'carrera',name:'Carrera',muscle:'Cardio',isCardio:true},
   {id:'bicicleta',name:'Bicicleta estática',muscle:'Cardio',isCardio:true},
   {id:'eliptica',name:'Elíptica',muscle:'Cardio',isCardio:true},
-  {id:'remo-cardio',name:'Remo (cardio)',muscle:'Cardio',isCardio:true},
-  {id:'cuerda',name:'Comba / Saltar a la cuerda',muscle:'Cardio',isCardio:true},
+  {id:'remo-cardio',name:'Remo ergómetro',muscle:'Cardio',isCardio:true},
+  {id:'cuerda',name:'Comba',muscle:'Cardio',isCardio:true},
 ];
+
+// Nombres anteriores de los ejercicios por defecto, para migrar datos guardados con ellos
+const LEGACY_NAMES={
+  'press-banca':['Press banca'],
+  'aperturas':['Aperturas con mancuernas'],
+  'fondos':['Fondos en paralelas'],
+  'jalones':['Jalones al pecho'],
+  'dominadas':['Dominadas'],
+  'elevaciones-lat':['Elevaciones laterales'],
+  'extension-triceps':['Extensión tríceps polea'],
+  'remo-cardio':['Remo (cardio)'],
+  'cuerda':['Comba / Saltar a la cuerda'],
+};
+const DEFAULT_BY_ID=Object.fromEntries(DEFAULT_LIBRARY.map(e=>[e.id,e]));
+// Nombre (antiguo o actual) de un ejercicio por defecto → id
+const DEFAULT_ID_BY_NAME=Object.fromEntries([
+  ...DEFAULT_LIBRARY.map(e=>[e.name,e.id]),
+  ...Object.entries(LEGACY_NAMES).flatMap(([id,names])=>names.map(n=>[n,id])),
+]);
+
+// Actualiza el nombre de un ejercicio de sesión al estándar actual. Solo toca nombres que coinciden
+// exactamente con uno por defecto (los renombrados por el usuario y los personalizados se respetan).
+// Si no tiene libraryId pero el nombre es de uno por defecto, lo vincula. Idempotente.
+function migrateExercise(e){
+  if(e.libraryId){
+    const def=DEFAULT_BY_ID[e.libraryId];
+    return def&&LEGACY_NAMES[e.libraryId]?.includes(e.name)?{...e,name:def.name}:e;
+  }
+  const id=DEFAULT_ID_BY_NAME[e.name];
+  return id?{...e,libraryId:id,name:DEFAULT_BY_ID[id].name}:e;
+}
+function migrateSessions(sessions){
+  return sessions.map(s=>({...s,exercises:s.exercises.map(migrateExercise)}));
+}
+function migrateLibrary(library){
+  return library.map(e=>DEFAULT_BY_ID[e.id]&&LEGACY_NAMES[e.id]?.includes(e.name)?{...e,name:DEFAULT_BY_ID[e.id].name}:e);
+}
 
 // ---- Local Storage ----
 function loadState(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
@@ -571,6 +609,11 @@ function parseLocalDate(s){return /^\d{4}-\d{2}-\d{2}$/.test(s)?new Date(s+'T00:
 function isValidDate(s){return !isNaN(parseLocalDate(s).getTime());}
 // Identidad estable de un ejercicio: libraryId sobrevive a renombrados; el nombre es fallback para datos antiguos
 function exKey(e){return e.libraryId?'id:'+e.libraryId:'name:'+e.name;}
+// Texto para búsqueda: sin tildes ni mayúsculas
+function normalizeText(s){return String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();}
+const SEARCH_STOPWORDS=new Set(['de','del','la','el','los','las','con','en','al','a','y']);
+// Palabras de la consulta (orden indiferente), sin palabras vacías
+function searchTokens(q){return normalizeText(q).split(/\s+/).filter(t=>t&&!SEARCH_STOPWORDS.has(t));}
 
 // ---- Charts ----
 // Sigue el tema del sistema en vivo para que los gráficos se repinten al cambiar a modo oscuro/claro
@@ -631,10 +674,12 @@ function ExercisePicker({library,onSelect,onCreateNew}){
     document.addEventListener('touchstart',h);document.addEventListener('mousedown',h);
     return()=>{document.removeEventListener('touchstart',h);document.removeEventListener('mousedown',h)};
   },[]);
+  const haystacks=useMemo(()=>library.map(e=>normalizeText(e.name+' '+e.muscle)),[library]);
   const filtered=useMemo(()=>{
-    const q=query.toLowerCase().trim();
-    return q?library.filter(e=>e.name.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q)):library;
-  },[library,query]);
+    const tokens=searchTokens(query);
+    if(!tokens.length)return library;
+    return library.filter((_,i)=>tokens.every(t=>haystacks[i].includes(t)));
+  },[library,haystacks,query]);
   const grouped=useMemo(()=>{
     const g={};filtered.forEach(e=>{if(!g[e.muscle])g[e.muscle]=[];g[e.muscle].push(e);});return g;
   },[filtered]);
@@ -1425,7 +1470,7 @@ function WorkoutTimer({timerStart,lastActivity,pausedAt,onAutoPause}){
 function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary,onActiveSessionChange}){
   const [exercises,setExercises]=useState(()=>{
     // Restore draft on mount if one exists
-    try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return d?.exercises||[];}catch{return[];}
+    try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return (d?.exercises||[]).map(migrateExercise);}catch{return[];}
   });
   const [timerStart,setTimerStart]=useState(()=>{
     try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return d?.timerStart||null;}catch{return null;}
@@ -1493,6 +1538,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     if(exercises.length===0)return;
     const now=Date.now();
     setLastActivity(now);
+    setDraftBanner(null); // al retomar la sesión el borrador ya está recuperado
     if(pausedAt){
       // Resume: shift timerStart forward by paused duration so elapsed continues smoothly
       setTimerStart(ts=>ts+(now-pausedAt));
@@ -1808,17 +1854,8 @@ function TrainingCalendar({sessions}){
   const [viewYear,setViewYear]=useState(now.getFullYear());
   const [viewMonth,setViewMonth]=useState(now.getMonth()); // 0-based
 
-  // Build set of trained date strings "YYYY-MM-DD" for the viewed month
-  const trainedDays=useMemo(()=>{
-    const s=new Set();
-    sessions.forEach(sess=>{
-      const d=new Date(sess.date);
-      if(d.getFullYear()===viewYear&&d.getMonth()===viewMonth){
-        s.add(d.getDate());
-      }
-    });
-    return s;
-  },[sessions,viewYear,viewMonth]);
+  // Fechas locales "YYYY-MM-DD" con entrenamiento (incluye otros meses para las celdas de los bordes)
+  const trainedDays=useMemo(()=>new Set(sessions.map(s=>localISODate(new Date(s.date)))),[sessions]);
 
   function prevMonth(){
     if(viewMonth===0){setViewMonth(11);setViewYear(y=>y-1);}
@@ -1835,21 +1872,21 @@ function TrainingCalendar({sessions}){
   const monthName=new Date(viewYear,viewMonth,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
   const firstDow=(new Date(viewYear,viewMonth,1).getDay()+6)%7; // Mon=0
   const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
-  const daysInPrev=new Date(viewYear,viewMonth,0).getDate();
   const totalCells=Math.ceil((firstDow+daysInMonth)/7)*7;
   const isCurrentMonth=viewYear===now.getFullYear()&&viewMonth===now.getMonth();
-  const trainedCount=trainedDays.size;
+  const todayISO=localISODate(now);
 
   const cells=[];
+  let trainedCount=0;
   for(let i=0;i<totalCells;i++){
-    let day,isCurrentMonthDay=true;
-    if(i<firstDow){day=daysInPrev-firstDow+1+i;isCurrentMonthDay=false;}
-    else if(i>=firstDow+daysInMonth){day=i-firstDow-daysInMonth+1;isCurrentMonthDay=false;}
-    else{day=i-firstDow+1;}
-    const isTrained=isCurrentMonthDay&&trainedDays.has(day);
-    const isToday=isCurrentMonthDay&&isCurrentMonth&&day===now.getDate();
-    const cls=['cal-day',!isCurrentMonthDay?'other-month':'',isTrained?'trained':'',isToday?'today':''].filter(Boolean).join(' ');
-    cells.push(h('div',{key:i,className:cls},day));
+    // new Date desborda solo al mes anterior/siguiente para las celdas de los bordes
+    const date=new Date(viewYear,viewMonth,i-firstDow+1);
+    const iso=localISODate(date);
+    const isCurrentMonthDay=date.getMonth()===viewMonth;
+    const isTrained=trainedDays.has(iso);
+    if(isTrained&&isCurrentMonthDay)trainedCount++;
+    const cls=['cal-day',!isCurrentMonthDay?'other-month':'',isTrained?'trained':'',iso===todayISO?'today':''].filter(Boolean).join(' ');
+    cells.push(h('div',{key:i,className:cls},date.getDate()));
   }
 
   const atMaxMonth=isCurrentMonth;
@@ -2110,8 +2147,8 @@ function repairWeightLog(log){
 // ---- App Root ----
 function App(){
   const [tab,setTab]=useState('workout');
-  const [sessions,setSessions]=useState(()=>loadState('il_sessions',[]));
-  const [library,setLibrary]=useState(()=>loadState('il_library',DEFAULT_LIBRARY));
+  const [sessions,setSessions]=useState(()=>migrateSessions(loadState('il_sessions',[])));
+  const [library,setLibrary]=useState(()=>migrateLibrary(loadState('il_library',DEFAULT_LIBRARY)));
   const [profile,setProfile]=useState(()=>loadState('il_profile',{name:'',sex:'',dob:''}));
   const [weightLog,setWeightLog]=useState(()=>repairWeightLog(loadState('il_weightlog',[])));
   const [hasActiveSession,setHasActiveSession]=useState(false);
@@ -2138,8 +2175,8 @@ function App(){
   const needsBackup=sessions.length>0&&(backupAgeDays===null||backupAgeDays>=BACKUP_REMINDER_DAYS);
   function removeWeight(id){setWeightLog(prev=>prev.filter(e=>e.id!==id));}
   function restoreBackup(data){
-    setSessions(data.sessions);
-    setLibrary(data.library);
+    setSessions(migrateSessions(data.sessions));
+    setLibrary(migrateLibrary(data.library));
     if(data.profile)setProfile(data.profile);
     if(data.weightLog)setWeightLog(repairWeightLog(data.weightLog));
   }
