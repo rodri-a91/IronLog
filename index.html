@@ -412,6 +412,27 @@ body{
 .sc-map-side{text-align:center}
 .sc-map-side-label{font-size:10px;color:var(--t2);margin-top:6px;font-weight:500}
 
+/* Body map: placas musculares separadas por un trazo del color de la tarjeta */
+:root{--bm-sil:#ebe8e1;--bm-l0:#dedad1;--bm-l1:#F7C1C1;--bm-l2:#EE8A89;--bm-l3:#E24B4A;--bm-l4:#A32D2D}
+@media(prefers-color-scheme:dark){
+  /* En oscuro la intensidad sube en luminosidad: más series = más claro */
+  :root{--bm-sil:#33322f;--bm-l0:#3d3c38;--bm-l1:#762d2d;--bm-l2:#b23434;--bm-l3:#E24B4A;--bm-l4:#ffa3a2}
+}
+.bm{display:block}
+.bm path,.bm rect,.bm ellipse{stroke:var(--card);stroke-width:1.2;stroke-linejoin:round}
+.bm-sil{fill:var(--bm-sil)}
+.bm-l0{fill:var(--bm-l0)}
+.bm-l1{fill:var(--bm-l1)}.bm-l2{fill:var(--bm-l2)}.bm-l3{fill:var(--bm-l3)}.bm-l4{fill:var(--bm-l4)}
+.bm .bm-l1,.bm .bm-l2,.bm .bm-l3,.bm .bm-l4{animation:bmIn .7s .35s both ease-out}
+@keyframes bmIn{from{fill:var(--bm-l0)}}
+.bm-scale{display:flex;align-items:center;justify-content:center;gap:10px;font-size:11px;color:var(--t2);margin:-4px 0 6px;flex-wrap:wrap}
+.bm-scale-title{font-weight:600;text-transform:uppercase;letter-spacing:.4px;font-size:10px}
+.bm-scale-item{display:inline-flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums}
+.bm-scale-swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+.bm-scale-swatch.bm-l1{background:var(--bm-l1)}.bm-scale-swatch.bm-l2{background:var(--bm-l2)}
+.bm-scale-swatch.bm-l3{background:var(--bm-l3)}.bm-scale-swatch.bm-l4{background:var(--bm-l4)}
+.bm-note{font-size:11px;color:var(--t2);text-align:center;margin-bottom:18px;line-height:1.4}
+
 .sc-muscle-legend{display:flex;flex-direction:column;gap:7px;margin-bottom:20px}
 .sc-legend-row{display:flex;align-items:center;gap:10px}
 .sc-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
@@ -1136,213 +1157,161 @@ const Icons={
   stats:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M3 3v18h18'}),h('path',{d:'M7 16l4-4 4 4 5-5'})),
 };
 
-// Map app muscle groups → body-region keys
-const MUSCLE_TO_REGIONS={
-  Pecho:   ['chest'],
-  Espalda: ['upperback','lats'],
-  Piernas: ['quads','hamstrings','calves'],
-  Hombros: ['deltF','deltB'],
-  Bíceps:  ['biceps'],
-  Tríceps: ['triceps'],
-  Core:    ['abs'],
-  Glúteos: ['glutes'],
-  Cardio:  ['chest','upperback','lats','quads','hamstrings','abs','deltF','deltB'],
+// ---- Body Map ----
+// Zonas del dibujo: chest, deltF (hombro frontal), deltS (lateral), deltB (posterior), traps, upperback
+// (romboides/infraespinoso), lats, lowerback, biceps, triceps, forearms, abs, obliques, glutes, quads,
+// hamstrings, calves.
+// Músculos principales (p) y secundarios (s) de cada ejercicio por defecto
+const EXERCISE_REGIONS={
+  'press-banca':      {p:['chest'],s:['deltF','triceps']},
+  'press-inclinado':  {p:['chest','deltF'],s:['triceps']},
+  'aperturas':        {p:['chest'],s:['deltF']},
+  'fondos':           {p:['chest','triceps'],s:['deltF']},
+  'jalones':          {p:['lats'],s:['biceps','upperback','deltB']},
+  'remo-barra':       {p:['lats','upperback'],s:['biceps','deltB','lowerback']},
+  'dominadas':        {p:['lats'],s:['biceps','upperback','deltB']},
+  'remo-polea':       {p:['lats','upperback'],s:['biceps','deltB']},
+  'sentadilla':       {p:['quads','glutes'],s:['hamstrings','lowerback']},
+  'prensa':           {p:['quads','glutes'],s:['hamstrings']},
+  'peso-muerto':      {p:['hamstrings','glutes','lowerback'],s:['quads','traps','forearms']},
+  'extension-cuad':   {p:['quads'],s:[]},
+  'curl-femoral':     {p:['hamstrings'],s:['calves']},
+  'press-militar':    {p:['deltF','deltS'],s:['triceps','traps']},
+  'elevaciones-lat':  {p:['deltS'],s:['traps']},
+  'pajaro':           {p:['deltB'],s:['upperback']},
+  'curl-biceps':      {p:['biceps'],s:['forearms']},
+  'curl-martillo':    {p:['biceps','forearms'],s:[]},
+  'press-frances':    {p:['triceps'],s:[]},
+  'extension-triceps':{p:['triceps'],s:[]},
+  'crunch':           {p:['abs'],s:['obliques']},
+  'plancha':          {p:['abs'],s:['obliques','lowerback']},
+  'hip-thrust':       {p:['glutes'],s:['hamstrings']},
+  'patada-gluteo':    {p:['glutes'],s:['hamstrings']},
+  'carrera':          {p:['quads','hamstrings','calves'],s:['glutes']},
+  'bicicleta':        {p:['quads'],s:['hamstrings','glutes','calves']},
+  'eliptica':         {p:['quads','glutes'],s:['hamstrings','calves']},
+  'remo-cardio':      {p:['lats','quads'],s:['upperback','biceps','hamstrings','glutes']},
+  'cuerda':           {p:['calves'],s:['quads','deltS']},
+};
+// Ejercicios personalizados: según su grupo muscular
+const GROUP_REGIONS={
+  Pecho:{p:['chest'],s:['deltF','triceps']},
+  Espalda:{p:['lats','upperback'],s:['biceps','deltB']},
+  Piernas:{p:['quads','hamstrings'],s:['glutes','calves']},
+  Hombros:{p:['deltF','deltS'],s:['deltB','traps']},
+  'Bíceps':{p:['biceps'],s:['forearms']},
+  'Tríceps':{p:['triceps'],s:[]},
+  Core:{p:['abs'],s:['obliques']},
+  'Glúteos':{p:['glutes'],s:['hamstrings']},
+  Cardio:{p:['quads','calves'],s:['hamstrings','glutes']},
+};
+const CARDIO_MIN_PER_SET=10; // 10 min de cardio cuentan como 1 serie
+const SECONDARY_FACTOR=0.5;
+
+// Series equivalentes de un ejercicio
+function exerciseLoad(ex){
+  if(ex.isCardio)return ex.sets.reduce((t,s)=>t+(parseFloat(s.duration)||0),0)/CARDIO_MIN_PER_SET;
+  return ex.sets.filter(s=>setHasData(ex,s)).length;
+}
+// Series por zona del cuerpo; los músculos secundarios suman media serie
+function regionLoads(exercises){
+  const loads={};
+  exercises.forEach(ex=>{
+    const load=exerciseLoad(ex);
+    if(!load)return;
+    const {p,s}=EXERCISE_REGIONS[ex.libraryId]||GROUP_REGIONS[ex.muscle]||{p:[],s:[]};
+    p.forEach(k=>loads[k]=(loads[k]||0)+load);
+    s.forEach(k=>loads[k]=(loads[k]||0)+load*SECONDARY_FACTOR);
+  });
+  return loads;
+}
+// Escala absoluta (no relativa a la sesión): una sesión ligera no aparece "al máximo"
+const LOAD_LEVELS=[{max:2.5,label:'1–2'},{max:4.5,label:'3–4'},{max:7.5,label:'5–7'},{max:Infinity,label:'8+'}];
+function loadLevel(v){return v>0?LOAD_LEVELS.findIndex(l=>v<l.max)+1:0;}
+
+// Formas de media figura (lado izquierdo de la imagen); se reflejan para el otro lado.
+// [zona | null (silueta), etiqueta SVG, atributos]. viewBox 0 0 120 260, eje de simetría x=60.
+const BODY_SHAPES={
+  front:{
+    center:[
+      [null,'ellipse',{cx:60,cy:19,rx:11,ry:14}],
+      [null,'path',{d:'M54 31 L66 31 L66 42 L54 42 Z'}],
+    ],
+    half:[
+      ['traps','path',{d:'M55 36 L55 46 L43 47 Q50 43 55 36 Z'}],
+      ['chest','path',{d:'M58.5 49 L44 49 Q37 53 35 62 Q35 73 41 79 Q50 83 58.5 81 Z'}],
+      ['deltS','path',{d:'M31 47 Q24 50 22 58 Q21 65 23 72 L27 72 Q26 62 32 51 Z'}],
+      ['deltF','path',{d:'M43 48 Q36 45 32 48 Q27 58 28 72 L33 72 Q35 61 43 53 Z'}],
+      ['biceps','path',{d:'M23 75 Q19 85 19 96 Q21 102 26 101 Q31 92 32 76 Z'}],
+      ['forearms','path',{d:'M19 104 Q14 116 13 131 Q15 136 19 136 Q24 121 28 104 Z'}],
+      [null,'ellipse',{cx:15,cy:144,rx:5,ry:7.5}],
+      ['abs','rect',{x:50.5,y:84,width:8,height:10,rx:2}],
+      ['abs','rect',{x:50.5,y:96,width:8,height:10,rx:2}],
+      ['abs','rect',{x:50.5,y:108,width:8,height:10,rx:2}],
+      ['abs','rect',{x:51.5,y:120,width:7,height:14,rx:2}],
+      ['obliques','path',{d:'M48 84 Q41 82 38 89 Q37 105 40 119 Q44 126 48.5 129 Z'}],
+      [null,'path',{d:'M40 122 Q44 132 52 138 L58.5 140 L58.5 137 Q51 133 48.5 129 Q44 126 40 122 Z'}],
+      ['quads','path',{d:'M39 133 Q32 152 33 176 Q34 192 39 201 L45 200 Q44 174 50 145 Q45 139 39 133 Z'}],
+      ['quads','path',{d:'M51 147 Q46 172 47 200 L55 202 Q58.5 180 58.5 150 Z'}],
+      [null,'ellipse',{cx:46,cy:207,rx:7,ry:4.5}],
+      ['calves','path',{d:'M39 213 Q34 227 37 244 L43 246 Q44 228 44.5 213 Z'}],
+      ['calves','path',{d:'M46.5 213 Q48 228 47 246 L53 246 Q56 228 52 213 Z'}],
+      [null,'path',{d:'M37 249 L54 249 L56 256 Q46 258 35 256 Z'}],
+    ],
+  },
+  back:{
+    center:[
+      [null,'ellipse',{cx:60,cy:19,rx:11,ry:14}],
+      [null,'path',{d:'M54 31 L66 31 L66 38 L54 38 Z'}],
+    ],
+    half:[
+      ['traps','path',{d:'M59.5 35 L55 36 Q50 43 41 47 Q49 52 54 60 L59.5 76 Z'}],
+      ['upperback','path',{d:'M42 52 Q36 57 36 66 Q41 74 50 76 L53.5 64 Q50 56 42 52 Z'}],
+      ['lats','path',{d:'M35 71 Q34 86 38 100 Q44 111 52 116 L56 98 L54.5 80 Q46 79 35 71 Z'}],
+      ['lowerback','path',{d:'M55.5 84 L59.5 80 L59.5 126 L52 126 Q54 112 55.5 84 Z'}],
+      ['deltS','path',{d:'M31 47 Q24 50 22 58 Q21 65 23 72 L27 72 Q26 62 32 51 Z'}],
+      ['deltB','path',{d:'M42 48 Q36 45 32 48 Q27 58 28 72 L33 72 Q35 61 41 52 Z'}],
+      ['triceps','path',{d:'M23 75 Q19 85 19 96 Q21 102 26 101 Q31 92 32 76 Z'}],
+      ['forearms','path',{d:'M19 104 Q14 116 13 131 Q15 136 19 136 Q24 121 28 104 Z'}],
+      [null,'ellipse',{cx:15,cy:144,rx:5,ry:7.5}],
+      ['glutes','path',{d:'M59.5 129 Q48 126 40 132 Q35 143 38 155 Q46 163 59.5 159 Z'}],
+      ['hamstrings','path',{d:'M38 159 Q33 177 36 200 L45 202 Q45 181 50 162 Q44 162 38 159 Z'}],
+      ['hamstrings','path',{d:'M52 163 Q47 181 47.5 202 L56 202 Q58.5 183 58.5 162 Z'}],
+      [null,'ellipse',{cx:46,cy:207,rx:7,ry:4.5}],
+      ['calves','path',{d:'M38.5 212 Q33 224 36 237 Q40 241 45 237 Q46 223 45 212 Z'}],
+      ['calves','path',{d:'M47 212 Q46 225 48 239 Q53 241 55 235 Q57 223 53 212 Z'}],
+      [null,'path',{d:'M39 240 Q45 243 54 240 L53 249 L40 249 Z'}],
+      [null,'path',{d:'M37 250 L54 250 L56 256 Q46 258 35 256 Z'}],
+    ],
+  },
 };
 
-// ---- Body Map SVG — detailed anatomical illustration ----
-function muscleColor(intensity,base){
-  if(intensity<=0)return base||'rgba(90,85,80,0.18)';
-  const t=Math.pow(intensity,.7);
-  const r=Math.round(210+25*t), g=Math.round(55-45*t), b=Math.round(55-45*t);
-  const a=0.25+0.75*t;
-  return `rgba(${r},${g},${b},${a})`;
-}
-const SKIN='rgba(195,165,130,0.55)';
-const BODY='rgba(80,75,70,0.14)';
-const LINE='rgba(255,255,255,0.08)';
-
-function FrontBody({ri}){
-  const c=k=>muscleColor(ri[k]||0);
-  return h('svg',{viewBox:'0 0 110 230',width:110,height:230,style:{display:'block',overflow:'visible'}},
-    h('defs',null,
-      h('radialGradient',{id:'headG',cx:'45%',cy:'38%',r:'55%'},
-        h('stop',{offset:'0%',stopColor:'rgba(210,175,140,0.7)'}),
-        h('stop',{offset:'100%',stopColor:'rgba(175,140,110,0.45)'})
-      )
+function BodyFigure({side,loads,label}){
+  const shapes=BODY_SHAPES[side];
+  const shape=([region,tag,attrs],i)=>h(tag,{key:i,...attrs,className:region?'bm-l'+loadLevel(loads[region]):'bm-sil'});
+  return h('div',{className:'sc-map-side'},
+    h('svg',{viewBox:'0 0 120 260',width:132,height:286,className:'bm',role:'img','aria-label':'Músculos trabajados, vista '+label.toLowerCase()},
+      shapes.center.map(shape),
+      h('g',null,shapes.half.map(shape)),
+      h('g',{transform:'translate(120,0) scale(-1,1)'},shapes.half.map(shape))
     ),
-    // --- Silhouette base ---
-    h('path',{d:'M42 55 C30 57 22 64 20 76 L16 118 C15 122 18 125 22 125 L88 125 C92 125 95 122 94 118 L90 76 C88 64 80 57 68 55 Z',fill:BODY}),
-    h('path',{d:'M22 125 C20 138 20 148 22 158 L44 160 L66 160 L88 158 C90 148 90 138 88 125 Z',fill:BODY,opacity:.8}),
-    h('path',{d:'M22 158 C18 172 19 188 22 202 L34 206 L40 202 C41 188 41 172 39 158 Z',fill:BODY}),
-    h('path',{d:'M88 158 C92 172 91 188 88 202 L76 206 L70 202 C69 188 69 172 71 158 Z',fill:BODY}),
-    h('path',{d:'M22 202 C20 210 21 218 23 224 L32 226 L36 222 C37 214 36 207 34 202 Z',fill:BODY}),
-    h('path',{d:'M88 202 C90 210 89 218 87 224 L78 226 L74 222 C73 214 74 207 76 202 Z',fill:BODY}),
-    // Arms base
-    h('path',{d:'M20 76 C15 78 10 84 9 94 L8 112 C8 116 11 119 14 118 L22 116 C22 116 20 100 22 76 Z',fill:BODY}),
-    h('path',{d:'M90 76 C95 78 100 84 101 94 L102 112 C102 116 99 119 96 118 L88 116 C88 116 90 100 88 76 Z',fill:BODY}),
-    h('path',{d:'M8 112 C7 118 7 126 8 134 L10 140 C12 141 15 140 16 138 L18 118 Z',fill:BODY}),
-    h('path',{d:'M102 112 C103 118 103 126 102 134 L100 140 C98 141 95 140 94 138 L92 118 Z',fill:BODY}),
-    h('ellipse',{cx:9,cy:143,rx:5,ry:7,fill:SKIN,opacity:.6}),
-    h('ellipse',{cx:101,cy:143,rx:5,ry:7,fill:SKIN,opacity:.6}),
-
-    // --- Chest (pectorals) ---
-    h('path',{d:'M38 57 C34 61 32 67 34 72 C38 76 44 77 55 77 C66 77 72 76 76 72 C78 67 76 61 72 57 C66 54 60 53 55 53 C50 53 44 54 38 57 Z',fill:c('chest'),opacity:.95}),
-    // pec divide line
-    h('line',{x1:55,y1:57,x2:55,y2:77,stroke:LINE,strokeWidth:.8}),
-    // lower pec curve
-    h('path',{d:'M34 72 Q45 80 55 79 Q65 80 76 72',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
-
-    // --- Front delts ---
-    h('ellipse',{cx:24,cy:63,rx:9,ry:7,fill:c('deltF'),transform:'rotate(-18,24,63)',opacity:.95}),
-    h('ellipse',{cx:86,cy:63,rx:9,ry:7,fill:c('deltF'),transform:'rotate(18,86,63)',opacity:.95}),
-
-    // --- Biceps ---
-    h('path',{d:'M11 82 C9 88 9 96 10 104 C13 108 17 108 19 105 C21 97 22 88 20 80 C17 78 13 79 11 82 Z',fill:c('biceps'),opacity:.95}),
-    h('path',{d:'M99 82 C101 88 101 96 100 104 C97 108 93 108 91 105 C89 97 88 88 90 80 C93 78 97 79 99 82 Z',fill:c('biceps'),opacity:.95}),
-    // bicep peak line
-    h('path',{d:'M11 90 Q15 86 19 90',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
-    h('path',{d:'M99 90 Q95 86 91 90',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
-
-    // --- Forearms ---
-    h('path',{d:'M9 107 C8 114 8 122 9 130 L11 136 C13 137 16 136 17 133 L18 106 Z',fill:SKIN,opacity:.7}),
-    h('path',{d:'M101 107 C102 114 102 122 101 130 L99 136 C97 137 94 136 93 133 L92 106 Z',fill:SKIN,opacity:.7}),
-
-    // --- Abs ---
-    h('path',{d:'M42 78 L68 78 L70 118 L55 121 L40 118 Z',fill:'transparent'}),
-    // 3 rows of 2 abs
-    ...[0,1,2].map(row=>[
-      h('path',{key:'abl'+row,d:`M43 ${79+row*13} L53 ${79+row*13} L52 ${90+row*13} L43 ${90+row*13} Z`,fill:c('abs'),rx:2,opacity:.85}),
-      h('path',{key:'abr'+row,d:`M57 ${79+row*13} L67 ${79+row*13} L67 ${90+row*13} L58 ${90+row*13} Z`,fill:c('abs'),rx:2,opacity:.85}),
-    ]).flat(),
-    // linea alba
-    h('line',{x1:55,y1:78,x2:55,y2:118,stroke:'rgba(0,0,0,0.12)',strokeWidth:.7}),
-    // horizontal ab lines
-    ...[79,92,105].map(y=>h('line',{key:y,x1:43,y1:y,x2:67,y2:y,stroke:'rgba(0,0,0,0.1)',strokeWidth:.6})),
-
-    // --- Obliques ---
-    h('path',{d:'M38 90 L42 78 L42 118 L36 110 Z',fill:c('abs'),opacity:.6}),
-    h('path',{d:'M72 90 L68 78 L68 118 L74 110 Z',fill:c('abs'),opacity:.6}),
-
-    // --- Hip/iliac crest ---
-    h('path',{d:'M22 125 Q35 132 55 133 Q75 132 88 125 L88 128 Q75 136 55 137 Q35 136 22 128 Z',fill:BODY,opacity:.6}),
-
-    // --- Quads ---
-    h('path',{d:'M22 158 C20 170 20 186 23 200 L33 204 L39 200 C42 186 43 170 42 158 C38 155 27 154 22 158 Z',fill:c('quads'),opacity:.95}),
-    h('path',{d:'M88 158 C90 170 90 186 87 200 L77 204 L71 200 C68 186 67 170 68 158 C72 155 83 154 88 158 Z',fill:c('quads'),opacity:.95}),
-    // VMO (inner quad sweep)
-    h('path',{d:'M39 158 C41 168 44 180 44 196 L56 196 C56 180 59 168 71 158 C66 154 44 154 39 158 Z',fill:c('quads'),opacity:.8}),
-    // quad separation lines
-    h('path',{d:'M30 160 C32 178 34 194 34 202',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
-    h('path',{d:'M80 160 C78 178 76 194 76 202',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
-
-    // --- Calves ---
-    h('path',{d:'M22 204 C20 211 20 218 22 224 L31 227 L36 224 C37 216 37 208 35 204 Z',fill:c('calves'),opacity:.95}),
-    h('path',{d:'M88 204 C90 211 90 218 88 224 L79 227 L74 224 C73 216 73 208 75 204 Z',fill:c('calves'),opacity:.95}),
-    // calf split
-    h('path',{d:'M29 206 C29 215 29 221 30 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
-    h('path',{d:'M81 206 C81 215 81 221 80 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
-
-    // --- Head ---
-    h('ellipse',{cx:55,cy:30,rx:16,ry:19,fill:'url(#headG)'}),
-    h('path',{d:'M39 42 C39 46 43 50 55 51 C67 50 71 46 71 42',fill:SKIN,opacity:.4}),
-    // neck
-    h('path',{d:'M48 48 L48 56 C50 57 53 58 55 58 C57 58 60 57 62 56 L62 48 Z',fill:SKIN,opacity:.65}),
+    h('div',{className:'sc-map-side-label'},label)
   );
 }
 
-function BackBody({ri}){
-  const c=k=>muscleColor(ri[k]||0);
-  return h('svg',{viewBox:'0 0 110 230',width:110,height:230,style:{display:'block',overflow:'visible'}},
-    h('defs',null,
-      h('radialGradient',{id:'headG2',cx:'45%',cy:'38%',r:'55%'},
-        h('stop',{offset:'0%',stopColor:'rgba(210,175,140,0.7)'}),
-        h('stop',{offset:'100%',stopColor:'rgba(175,140,110,0.45)'})
-      )
+function BodyMap({exercises}){
+  const loads=useMemo(()=>regionLoads(exercises),[exercises]);
+  return h('div',null,
+    h('div',{className:'sc-map-wrap'},
+      h(BodyFigure,{side:'front',loads,label:'Frontal'}),
+      h(BodyFigure,{side:'back',loads,label:'Posterior'})
     ),
-    // --- Silhouette ---
-    h('path',{d:'M42 55 C30 57 22 64 20 76 L16 118 C15 122 18 125 22 125 L88 125 C92 125 95 122 94 118 L90 76 C88 64 80 57 68 55 Z',fill:BODY}),
-    h('path',{d:'M22 125 C20 138 20 150 22 162 L44 165 L66 165 L88 162 C90 150 90 138 88 125 Z',fill:BODY,opacity:.8}),
-    h('path',{d:'M22 162 C18 176 18 192 22 206 L35 210 L41 206 C42 192 42 176 39 162 Z',fill:BODY}),
-    h('path',{d:'M88 162 C92 176 92 192 88 206 L75 210 L69 206 C68 192 68 176 71 162 Z',fill:BODY}),
-    h('path',{d:'M22 206 C20 213 20 220 22 226 L31 228 L36 224 C37 216 36 208 35 206 Z',fill:BODY}),
-    h('path',{d:'M88 206 C90 213 90 220 88 226 L79 228 L74 224 C73 216 74 208 75 206 Z',fill:BODY}),
-    // Arms base
-    h('path',{d:'M20 76 C15 78 9 84 8 96 L7 114 C7 118 10 120 14 119 L22 117 Z',fill:BODY}),
-    h('path',{d:'M90 76 C95 78 101 84 102 96 L103 114 C103 118 100 120 96 119 L88 117 Z',fill:BODY}),
-    h('path',{d:'M7 114 C6 121 6 129 8 136 L10 141 C12 142 15 141 16 138 L17 117 Z',fill:BODY}),
-    h('path',{d:'M103 114 C104 121 104 129 102 136 L100 141 C98 142 95 141 94 138 L93 117 Z',fill:BODY}),
-    h('ellipse',{cx:9,cy:144,rx:5,ry:7,fill:SKIN,opacity:.55}),
-    h('ellipse',{cx:101,cy:144,rx:5,ry:7,fill:SKIN,opacity:.55}),
-
-    // --- Trapezius ---
-    h('path',{d:'M42 55 C46 52 50 51 55 51 C60 51 64 52 68 55 L65 70 C62 67 59 66 55 66 C51 66 48 67 45 70 Z',fill:c('upperback'),opacity:.95}),
-    // trap mid sections
-    h('path',{d:'M22 72 C28 68 36 67 45 70 L43 90 C36 88 28 88 22 90 Z',fill:c('upperback'),opacity:.7}),
-    h('path',{d:'M88 72 C82 68 74 67 65 70 L67 90 C74 88 82 88 88 90 Z',fill:c('upperback'),opacity:.7}),
-    // trap spine line
-    h('line',{x1:55,y1:55,x2:55,y2:90,stroke:'rgba(0,0,0,0.1)',strokeWidth:.8}),
-
-    // --- Rear delts ---
-    h('ellipse',{cx:24,cy:63,rx:9,ry:7,fill:c('deltB'),transform:'rotate(-18,24,63)',opacity:.95}),
-    h('ellipse',{cx:86,cy:63,rx:9,ry:7,fill:c('deltB'),transform:'rotate(18,86,63)',opacity:.95}),
-
-    // --- Triceps ---
-    h('path',{d:'M10 82 C8 90 8 100 10 108 C13 112 17 112 19 108 C21 98 22 88 20 80 C17 78 12 79 10 82 Z',fill:c('triceps'),opacity:.95}),
-    h('path',{d:'M100 82 C102 90 102 100 100 108 C97 112 93 112 91 108 C89 98 88 88 90 80 C93 78 98 79 100 82 Z',fill:c('triceps'),opacity:.95}),
-    h('path',{d:'M11 95 Q15 91 19 95',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
-    h('path',{d:'M99 95 Q95 91 91 95',fill:'none',stroke:'rgba(255,255,255,0.1)',strokeWidth:.7}),
-
-    // --- Forearms ---
-    h('path',{d:'M9 110 C8 118 8 126 10 133 L12 138 C14 139 16 138 17 135 L18 108 Z',fill:SKIN,opacity:.65}),
-    h('path',{d:'M101 110 C102 118 102 126 100 133 L98 138 C96 139 94 138 93 135 L92 108 Z',fill:SKIN,opacity:.65}),
-
-    // --- Lats ---
-    h('path',{d:'M20 80 C18 72 22 66 30 64 L45 70 L43 108 C34 106 24 98 20 86 Z',fill:c('lats'),opacity:.95}),
-    h('path',{d:'M90 80 C92 72 88 66 80 64 L65 70 L67 108 C76 106 86 98 90 86 Z',fill:c('lats'),opacity:.95}),
-
-    // --- Lower back (erectors) ---
-    h('path',{d:'M43 90 L45 122 L49 124 L49 90 Z',fill:c('upperback'),opacity:.5}),
-    h('path',{d:'M67 90 L65 122 L61 124 L61 90 Z',fill:c('upperback'),opacity:.5}),
-    h('path',{d:'M45 90 L49 90 L49 124 L45 124 Z',fill:c('upperback'),opacity:.25}),
-    h('path',{d:'M61 90 L65 90 L65 124 L61 124 Z',fill:c('upperback'),opacity:.25}),
-
-    // --- Glutes ---
-    h('path',{d:'M22 126 C20 136 19 148 22 160 C29 167 40 168 55 167 C70 168 81 167 88 160 C91 148 90 136 88 126 Z',fill:c('glutes'),opacity:.95}),
-    h('path',{d:'M55 127 L55 167',stroke:'rgba(0,0,0,0.1)',strokeWidth:.8}),
-    h('path',{d:'M22 140 Q35 148 55 149 Q75 148 88 140',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.7}),
-
-    // --- Hamstrings ---
-    h('path',{d:'M22 162 C19 175 19 191 22 204 L35 208 L41 204 C42 190 42 174 40 162 C35 158 27 158 22 162 Z',fill:c('hamstrings'),opacity:.95}),
-    h('path',{d:'M88 162 C91 175 91 191 88 204 L75 208 L69 204 C68 190 68 174 70 162 C75 158 83 158 88 162 Z',fill:c('hamstrings'),opacity:.95}),
-    // inner ham
-    h('path',{d:'M40 162 C41 174 43 190 44 202 L66 202 C67 190 69 174 70 162 C66 158 44 158 40 162 Z',fill:c('hamstrings'),opacity:.7}),
-    h('path',{d:'M31 164 C31 180 31 196 32 204',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
-    h('path',{d:'M79 164 C79 180 79 196 78 204',fill:'none',stroke:'rgba(0,0,0,0.07)',strokeWidth:.6}),
-
-    // --- Calves back ---
-    h('path',{d:'M22 206 C20 213 19 220 22 226 L31 228 L36 224 C37 216 36 208 35 206 Z',fill:c('calves'),opacity:.95}),
-    h('path',{d:'M88 206 C90 213 91 220 88 226 L79 228 L74 224 C73 216 74 208 75 206 Z',fill:c('calves'),opacity:.95}),
-    h('path',{d:'M28 208 C28 216 28 222 29 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
-    h('path',{d:'M82 208 C82 216 82 222 81 226',fill:'none',stroke:'rgba(0,0,0,0.08)',strokeWidth:.6}),
-
-    // --- Head ---
-    h('ellipse',{cx:55,cy:30,rx:16,ry:19,fill:'url(#headG2)'}),
-    h('path',{d:'M39 42 C39 46 43 50 55 51 C67 50 71 46 71 42',fill:SKIN,opacity:.35}),
-    h('path',{d:'M48 48 L48 56 C50 57 53 58 55 58 C57 58 60 57 62 56 L62 48 Z',fill:SKIN,opacity:.6}),
-  );
-}
-
-function BodyMap({muscleIntensity}){
-  const regionIntensity={};
-  Object.entries(muscleIntensity).forEach(([muscle,intensity])=>{
-    const regions=MUSCLE_TO_REGIONS[muscle]||[];
-    regions.forEach(r=>{
-      regionIntensity[r]=Math.max(regionIntensity[r]||0,intensity*(muscle==='Cardio'?0.4:1));
-    });
-  });
-  return h('div',{className:'sc-map-wrap'},
-    h('div',{className:'sc-map-side'},h(FrontBody,{ri:regionIntensity}),h('div',{className:'sc-map-side-label'},'Frontal')),
-    h('div',{className:'sc-map-side'},h(BackBody,{ri:regionIntensity}),h('div',{className:'sc-map-side-label'},'Posterior'))
+    h('div',{className:'bm-scale'},
+      h('span',{className:'bm-scale-title'},'Series'),
+      LOAD_LEVELS.map((l,i)=>h('span',{key:l.label,className:'bm-scale-item'},
+        h('span',{className:'bm-scale-swatch bm-l'+(i+1)}),l.label))
+    ),
+    h('div',{className:'bm-note'},'Los músculos secundarios cuentan media serie; el cardio, 1 serie cada '+CARDIO_MIN_PER_SET+' min.')
   );
 }
 
@@ -1361,24 +1330,16 @@ function SessionCompleteModal({session,onClose}){
   const [visible,setVisible]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setVisible(true),30);return()=>clearTimeout(t);},[]);
 
-  // Muscle volume map
-  const muscleVolume={};
+  // Reparto por grupo muscular en series (antes en kg, que inflaba los ejercicios pesados)
+  const groupLoad={};
   session.exercises.forEach(ex=>{
-    if(ex.isCardio){
-      const min=ex.sets.reduce((t,s)=>t+(parseFloat(s.duration)||0),0);
-      muscleVolume['Cardio']=(muscleVolume['Cardio']||0)+min*5; // weight equivalent proxy
-    } else {
-      const vol=ex.sets.reduce((t,s)=>t+(parseFloat(s.weight)||0)*(parseInt(s.reps)||0),0);
-      muscleVolume[ex.muscle]=(muscleVolume[ex.muscle]||0)+vol;
-    }
+    const group=ex.isCardio?'Cardio':ex.muscle;
+    groupLoad[group]=(groupLoad[group]||0)+exerciseLoad(ex);
   });
-  const totalVol=Object.values(muscleVolume).reduce((a,b)=>a+b,0)||1;
-  const musclePct=Object.entries(muscleVolume)
-    .map(([m,v])=>({muscle:m,pct:Math.round(v/totalVol*100)}))
+  const totalLoad=Object.values(groupLoad).reduce((a,b)=>a+b,0)||1;
+  const musclePct=Object.entries(groupLoad)
+    .map(([m,v])=>({muscle:m,pct:Math.round(v/totalLoad*100)}))
     .sort((a,b)=>b.pct-a.pct);
-  // normalised 0-1 for body map
-  const maxPct=musclePct[0]?.pct||1;
-  const muscleIntensity=Object.fromEntries(musclePct.map(({muscle,pct})=>[muscle,pct/maxPct]));
 
   const totalSets=session.exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.length,0);
   const totalCardioMin=session.exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
@@ -1436,7 +1397,7 @@ function SessionCompleteModal({session,onClose}){
 
         // Body map
         h('div',{className:'sc-map-title'},'Músculos trabajados'),
-        h(BodyMap,{muscleIntensity}),
+        h(BodyMap,{exercises:session.exercises}),
 
         // Legend bars
         h('div',{className:'sc-muscle-legend'},
