@@ -332,7 +332,7 @@ body{
 .ach-card{border:0.5px solid var(--border);border-radius:12px;padding:14px 12px;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;transition:opacity .2s}
 .ach-card.unlocked{background:var(--card);border-color:var(--border2)}
 .ach-card.locked{background:var(--bg2);opacity:.55}
-.ach-card.unlocked::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;border-radius:12px 12px 0 0}
+.ach-card.unlocked::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;border-radius:12px 12px 0 0;background:var(--ach-color)}
 .ach-icon{font-size:28px;line-height:1}
 .ach-name{font-size:13px;font-weight:700;color:var(--t1);line-height:1.2}
 .ach-desc{font-size:11px;color:var(--t2);line-height:1.4}
@@ -530,6 +530,8 @@ function localISODate(d=new Date()){return new Date(d.getTime()-d.getTimezoneOff
 // Interpreta "YYYY-MM-DD" como medianoche local, no UTC
 function parseLocalDate(s){return /^\d{4}-\d{2}-\d{2}$/.test(s)?new Date(s+'T00:00'):new Date(s);}
 function isValidDate(s){return !isNaN(parseLocalDate(s).getTime());}
+// Identidad estable de un ejercicio: libraryId sobrevive a renombrados; el nombre es fallback para datos antiguos
+function exKey(e){return e.libraryId?'id:'+e.libraryId:'name:'+e.name;}
 
 // ---- Charts ----
 function BarChart({labels,data,color}){
@@ -593,12 +595,13 @@ function ExercisePicker({library,onSelect,onCreateNew}){
     open&&h('div',{className:'picker-dropdown'},
       Object.entries(grouped).map(([muscle,exs])=>h('div',{key:muscle},
         h('div',{className:'picker-group-label'},muscle),
-        exs.map(ex=>h('div',{key:ex.id,className:'picker-option',onTouchEnd:e=>{e.preventDefault();select(ex);},onMouseDown:()=>select(ex)},
+        // onClick (no onTouchEnd): el navegador no lo dispara si el gesto fue un scroll de la lista
+        exs.map(ex=>h('div',{key:ex.id,className:'picker-option',onClick:()=>select(ex)},
           h('span',null,ex.name),
           h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle)
         ))
       )),
-      h('div',{className:'picker-new-row',onTouchEnd:e=>{e.preventDefault();setOpen(false);onCreateNew(query);},onMouseDown:()=>{setOpen(false);onCreateNew(query);}},
+      h('div',{className:'picker-new-row',onClick:()=>{setOpen(false);onCreateNew(query);}},
         h('span',{style:{fontSize:18,lineHeight:1}},'+'),
         h('span',null,query?`Crear "${query}"...`:'Añadir ejercicio nuevo')
       )
@@ -734,9 +737,12 @@ function calcStreak(sessions){
   }
   return max;
 }
-function maxWeightForExercise(sessions,exName){
+// Peso máximo en un ejercicio de la biblioteca por defecto. Se compara por libraryId (no por subcadena del nombre,
+// que contaba p.ej. "Sentadilla búlgara" como sentadilla); sesiones sin libraryId se comparan por nombre exacto.
+function maxWeightForExercise(sessions,libId){
+  const defName=DEFAULT_LIBRARY.find(e=>e.id===libId)?.name;
   let max=0;
-  sessions.forEach(s=>s.exercises.filter(e=>e.name.toLowerCase().includes(exName.toLowerCase())).forEach(e=>{
+  sessions.forEach(s=>s.exercises.filter(e=>e.libraryId?e.libraryId===libId:e.name===defName).forEach(e=>{
     e.sets.forEach(set=>{const w=parseFloat(set.weight)||0;if(w>max)max=w;});
   }));
   return max;
@@ -752,7 +758,7 @@ function muscleGroupCount(sessions){
 }
 function uniqueExerciseCount(sessions){
   const names=new Set();
-  sessions.forEach(s=>s.exercises.forEach(e=>names.add(e.name)));
+  sessions.forEach(s=>s.exercises.forEach(e=>names.add(exKey(e))));
   return names.size;
 }
 function maxSingleSessionVolume(sessions){
@@ -792,17 +798,17 @@ const ACHIEVEMENTS=[
   {id:'totalvol100',cat:'Fuerza',icon:'📦',name:'100 toneladas',desc:'100.000 kg de volumen acumulado',color:'#3B6D11',
    check:s=>totalVolume(s)>=100000,prog:s=>({v:Math.min(Math.round(totalVolume(s)),100000),t:100000})},
   {id:'bench80',cat:'Fuerza',icon:'💥',name:'Press bestial',desc:'80 kg en press de banca',color:'#E24B4A',
-   check:s=>maxWeightForExercise(s,'banca')>=80||maxWeightForExercise(s,'bench')>=80,
-   prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'banca')||maxWeightForExercise(s,'bench')),80),t:80})},
+   check:s=>maxWeightForExercise(s,'press-banca')>=80,
+   prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'press-banca')),80),t:80})},
   {id:'squat100',cat:'Fuerza',icon:'🦵',name:'Rey de la sentadilla',desc:'100 kg en sentadilla',color:'#3B6D11',
    check:s=>maxWeightForExercise(s,'sentadilla')>=100,
    prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'sentadilla')),100),t:100})},
   {id:'deadlift100',cat:'Fuerza',icon:'⚡',name:'Peso muerto bestial',desc:'100 kg en peso muerto',color:'#BA7517',
-   check:s=>maxWeightForExercise(s,'muerto')>=100,
-   prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'muerto')),100),t:100})},
+   check:s=>maxWeightForExercise(s,'peso-muerto')>=100,
+   prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'peso-muerto')),100),t:100})},
   {id:'press60',cat:'Fuerza',icon:'🦅',name:'Piernas de acero',desc:'60 kg en prensa de piernas',color:'#3B6D11',
-   check:s=>maxWeightForExercise(s,'prensa')>=60||maxWeightForExercise(s,'piernas')>=60,
-   prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'prensa')||maxWeightForExercise(s,'piernas')),60),t:60})},
+   check:s=>maxWeightForExercise(s,'prensa')>=60,
+   prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'prensa')),60),t:60})},
 
   // --- Quema ---
   {id:'cal500',cat:'Quema',icon:'🔆',name:'Horno',desc:'500 kcal en una sola sesión',color:'#BA7517',
@@ -847,7 +853,6 @@ function AchievementsSection({sessions}){
             const pct=a.progress.t>0?Math.round((a.progress.v/a.progress.t)*100):0;
             return h('div',{key:a.id,className:'ach-card '+(a.unlocked?'unlocked':'locked'),
               style:a.unlocked?{'--ach-color':a.color}:{}},
-              a.unlocked&&h('style',null,`[data-ach="${a.id}"]::before{background:${a.color}}`),
               h('span',{className:'ach-icon'},a.icon),
               h('div',{className:'ach-name'},a.name),
               h('div',{className:'ach-desc'},a.desc),
@@ -957,7 +962,10 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
         )
       ),
       h('div',{className:'profile-hero-edit'},
-        h('button',{className:'btn btns btnsm',onClick:()=>{setDraft(profile);setEditing(true);}},editing?'Cancelar':'Editar')
+        h('button',{className:'btn btns btnsm',onClick:()=>{
+          if(editing){setEditing(false);return;}
+          setDraft(profile);setEditing(true);
+        }},editing?'Cancelar':'Editar')
       )
     ),
 
@@ -1264,7 +1272,7 @@ const MUSCLE_PALETTE={
 
 function SessionCompleteModal({session,onClose}){
   const [visible,setVisible]=useState(false);
-  useEffect(()=>{setTimeout(()=>setVisible(true),30);},[]);
+  useEffect(()=>{const t=setTimeout(()=>setVisible(true),30);return()=>clearTimeout(t);},[]);
 
   // Muscle volume map
   const muscleVolume={};
@@ -1288,7 +1296,7 @@ function SessionCompleteModal({session,onClose}){
   const totalSets=session.exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.length,0);
   const totalCardioMin=session.exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
   const durationSecs=session.durationSecs||0;
-  const greeting=CONGRATS[Math.floor(Math.random()*CONGRATS.length)];
+  const [greeting]=useState(()=>CONGRATS[Math.floor(Math.random()*CONGRATS.length)]);
   const timeStr=new Date(session.date).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
 
   if(!visible)return null;
@@ -1405,6 +1413,16 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   const firstRender=useRef(true);
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
   const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
+  // Series de la última vez que se hizo cada ejercicio (sessions va de más reciente a más antigua).
+  // Memoizado: antes se recorría todo el historial por cada ejercicio en cada tick del cronómetro.
+  const prevSetsMap=useMemo(()=>{
+    const byKey={},byName={};
+    sessions.forEach(s=>s.exercises.forEach(x=>{
+      if(!(exKey(x) in byKey))byKey[exKey(x)]=x.sets;
+      if(!(x.name in byName))byName[x.name]=x.sets;
+    }));
+    return {byKey,byName};
+  },[sessions]);
 
   const INACTIVITY_MS=15*60*1000;
 
@@ -1482,15 +1500,21 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   }
   function save(){
     if(!exercises.length){alert('Añade al menos un ejercicio');return;}
-    if(!confirm('¿Terminar y guardar la sesión?'))return;
+    // Quitar series vacías y ejercicios que se queden sin series
+    const setHasData=(e,s)=>e.isCardio?(parseFloat(s.duration)>0||parseFloat(s.distance)>0):(parseFloat(s.weight)>0||parseInt(s.reps)>0);
+    const cleaned=exercises.map(e=>({...e,sets:e.sets.filter(s=>setHasData(e,s))})).filter(e=>e.sets.length>0);
+    if(!cleaned.length){alert('No hay ninguna serie con datos. Rellena al menos una serie antes de guardar.');return;}
+    const dropped=exercises.length-cleaned.length;
+    const msg='¿Terminar y guardar la sesión?'+(dropped>0?'\n\nSe ignorará'+(dropped>1?'n ':' ')+dropped+' ejercicio'+(dropped>1?'s':'')+' sin datos.':'');
+    if(!confirm(msg))return;
     clearInterval(timerRef.current);
     const realEnd=pausedAt||Date.now();
     const durationSecs=timerStart?Math.floor((realEnd-timerStart)/1000):0;
-    const cal=currentWeight>0?calcSessionCals(exercises,currentWeight):0;
-    const vol=exercises.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
-    const cardioMin=exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
-    const cardioKm=exercises.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.distance)||0),0),0);
-    const session={id:Date.now(),date:new Date().toISOString(),exercises:[...exercises],totalVolume:vol,totalCardioMin:cardioMin,totalCardioKm:cardioKm,calories:cal,durationSecs};
+    const cal=currentWeight>0?calcSessionCals(cleaned,currentWeight):0;
+    const vol=cleaned.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
+    const cardioMin=cleaned.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
+    const cardioKm=cleaned.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.distance)||0),0),0);
+    const session={id:Date.now(),date:new Date().toISOString(),exercises:cleaned,totalVolume:vol,totalCardioMin:cardioMin,totalCardioKm:cardioKm,calories:cal,durationSecs};
     onSave(session);
     setExercises([]);setTimerStart(null);setPausedAt(null);setElapsed(0);
     setDraftBanner(null);
@@ -1532,8 +1556,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     exercises.length>0&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},'Esta sesión ('+(exercises.length)+')'),
       exercises.map((e,i)=>{
-        const prevSession=sessions.find(s=>s.exercises.some(x=>x.name===e.name));
-        const prevSets=prevSession?prevSession.exercises.find(x=>x.name===e.name)?.sets||[]:[];
+        const prevSets=prevSetsMap.byKey[exKey(e)]||prevSetsMap.byName[e.name]||[];
         return h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>{
           // Solo pedimos confirmación si hay datos que perder
           const hasData=e.sets.some(s=>s.weight||s.reps||s.duration||s.distance);
@@ -1573,7 +1596,7 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
         h('div',{className:'modal-handle'}),
         h('div',{className:'modaltitle'},'Editar ejercicio'),
         h('div',{style:{fontSize:12,color:'var(--t2)',background:'var(--bg2)',borderRadius:8,padding:'8px 12px',marginBottom:14,lineHeight:1.5}},
-          '⚠ Cambiar el nombre o la categoría solo afecta a futuras sesiones. Las sesiones ya registradas conservan sus datos originales.'
+          '⚠ Las sesiones ya registradas conservan el nombre original en el historial, pero las estadísticas y la referencia de la sesión anterior siguen vinculadas a este ejercicio.'
         ),
         h('div',{className:'fg'},
           h('label',null,'Nombre'),
@@ -1617,7 +1640,7 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
                 className:'btn btns btnsm',
                 onClick:()=>setEditingEx({id:ex.id,name:ex.name,muscle:ex.muscle,isCardio:ex.isCardio})
               },'Editar'),
-              ex.id.startsWith('c-')&&h('button',{className:'btnd',onClick:()=>onRemove(ex.id)},'Eliminar')
+              String(ex.id).startsWith('c-')&&h('button',{className:'btnd',onClick:()=>onRemove(ex.id)},'Eliminar')
             )
           ))
     )
@@ -1625,9 +1648,7 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
 }
 
 // ---- History Tab ----
-function SessionDetail({session}){
-  const strEx=session.exercises.filter(e=>!e.isCardio);
-  const cardioEx=session.exercises.filter(e=>e.isCardio);
+function SessionDetail({session,onDelete}){
   return h('div',{className:'session-detail'},
     // Stats strip
     h('div',{className:'session-detail-stats'},
@@ -1680,11 +1701,16 @@ function SessionDetail({session}){
               }).filter(Boolean)
             )
       ))
+    ),
+    h('div',{style:{display:'flex',justifyContent:'flex-end',marginTop:14}},
+      h('button',{className:'btnd',onClick:()=>{
+        if(confirm('¿Eliminar la sesión del '+fmtDate(session.date)+'? Esta acción no se puede deshacer.'))onDelete(session.id);
+      }},'Eliminar sesión')
     )
   );
 }
 
-function HistoryTab({sessions}){
+function HistoryTab({sessions,onDelete}){
   const [openId,setOpenId]=useState(null);
   function toggle(id){setOpenId(prev=>prev===id?null:id);}
 
@@ -1719,7 +1745,7 @@ function HistoryTab({sessions}){
             // Expandable detail — always rendered, animated with grid-template-rows
             h('div',{className:'session-detail-wrap'},
               h('div',{className:'session-detail-wrap-inner'},
-                h(SessionDetail,{session:s})
+                h(SessionDetail,{session:s,onDelete})
               )
             )
           );
@@ -1802,12 +1828,30 @@ function TrainingCalendar({sessions}){
 }
 
 // ---- Stats Tab ----
-function StatsTab({sessions}){
+// Tramos del gráfico, de más antiguo a más reciente. Se construyen con fechas de calendario locales
+// (new Date(y,m,d+k)) para que el cambio de hora no desplace los límites.
+function statsBuckets(period,now=new Date()){
+  const y=now.getFullYear(),m=now.getMonth(),d=now.getDate();
+  if(period==='week')return Array.from({length:7},(_,i)=>{
+    const from=new Date(y,m,d-6+i);
+    return {label:from.toLocaleDateString('es-ES',{weekday:'short'}),from,to:new Date(y,m,d-5+i)};
+  });
+  if(period==='month')return Array.from({length:4},(_,i)=>{
+    const from=new Date(y,m,d-27+i*7);
+    return {label:fmtShort(from),from,to:new Date(y,m,d-20+i*7)};
+  });
+  return Array.from({length:12},(_,i)=>{
+    const from=new Date(y,m-11+i,1);
+    return {label:from.toLocaleDateString('es-ES',{month:'short'}),from,to:new Date(y,m-10+i,1)};
+  });
+}
+
+function StatsTab({sessions,library}){
   const [period,setPeriod]=useState('week');
   const [selEx,setSelEx]=useState('');
-  const now=new Date();
-  const cutoff=period==='week'?new Date(now-7*864e5):period==='month'?new Date(now-30*864e5):new Date(now-365*864e5);
-  const filtered=sessions.filter(s=>new Date(s.date)>=cutoff);
+  const buckets=useMemo(()=>statsBuckets(period),[period,sessions]);
+  const cutoff=buckets[0].from;
+  const filtered=useMemo(()=>sessions.filter(s=>new Date(s.date)>=cutoff),[sessions,cutoff]);
   const totalVol=filtered.reduce((s,x)=>s+x.totalVolume,0);
   const totalCal=filtered.reduce((s,x)=>s+(x.calories||0),0);
   const totalCardio=filtered.reduce((s,x)=>s+(x.totalCardioMin||0),0);
@@ -1816,35 +1860,43 @@ function StatsTab({sessions}){
     ?Math.round(filtered.filter(s=>s.durationSecs>0).reduce((t,s)=>t+(s.durationSecs||0),0)/filtered.filter(s=>s.durationSecs>0).length)
     :0;
 
-  function bucket(ss,i){
-    if(period==='week'){const d=new Date(now);d.setDate(d.getDate()-(6-i));return ss.filter(s=>new Date(s.date).toDateString()===d.toDateString());}
-    if(period==='month'){const df=i*7;return ss.filter(s=>{const d=Math.floor((now-new Date(s.date))/864e5);return d>=df&&d<df+7;});}
-    return ss.filter(s=>new Date(s.date).getMonth()===i);
-  }
-  let labels=[];
-  if(period==='week'){for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);labels.push(d.toLocaleDateString('es-ES',{weekday:'short'}));}}
-  else if(period==='month')labels=['S1','S2','S3','S4'];
-  else labels=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const volData=labels.map((_,i)=>Math.round(bucket(filtered,i).reduce((a,s)=>a+s.totalVolume,0)));
-  const calData=labels.map((_,i)=>bucket(filtered,i).reduce((a,s)=>a+(s.calories||0),0));
+  // Memoizados para que los gráficos no se destruyan y recreen en cada render
+  const {labels,volData,calData}=useMemo(()=>{
+    const inB=b=>filtered.filter(s=>{const d=new Date(s.date);return d>=b.from&&d<b.to;});
+    return {
+      labels:buckets.map(b=>b.label),
+      volData:buckets.map(b=>Math.round(inB(b).reduce((a,s)=>a+s.totalVolume,0))),
+      calData:buckets.map(b=>inB(b).reduce((a,s)=>a+(s.calories||0),0)),
+    };
+  },[buckets,filtered]);
 
-  const strengthExNames=[...new Set(sessions.flatMap(s=>s.exercises.filter(e=>!e.isCardio).map(e=>e.name)))].sort();
-  const selName=selEx||strengthExNames[0]||'';
-  const exHistory=sessions.slice().reverse().filter(s=>s.exercises.some(e=>e.name===selName)).map(s=>{
-    const ex=s.exercises.find(e=>e.name===selName);
-    return {date:fmtShort(s.date),maxW:Math.max(...ex.sets.map(s=>parseFloat(s.weight)||0))};
-  });
-
-  const allEx={};
-  sessions.forEach(s=>s.exercises.forEach(e=>{
-    if(e.isCardio)return;
-    if(!allEx[e.name])allEx[e.name]={name:e.name,max:0,cnt:0,muscle:e.muscle};
-    const mw=Math.max(...e.sets.map(s=>parseFloat(s.weight)||0));
-    if(mw>allEx[e.name].max)allEx[e.name].max=mw;
-    allEx[e.name].cnt++;
-  }));
-  const exList=Object.values(allEx).sort((a,b)=>b.cnt-a.cnt).slice(0,6);
-  const maxW=Math.max(...exList.map(e=>e.max),1);
+  // Ejercicios de fuerza agrupados por libraryId (sobrevive a renombrados); nombre actual de la biblioteca
+  const {strengthEx,exList,maxW}=useMemo(()=>{
+    const libName=Object.fromEntries(library.map(e=>[e.id,e.name]));
+    const all={};
+    sessions.forEach(s=>s.exercises.forEach(e=>{
+      if(e.isCardio)return;
+      const k=exKey(e);
+      if(!all[k])all[k]={key:k,name:libName[e.libraryId]||e.name,max:0,cnt:0,muscle:e.muscle};
+      const mw=Math.max(0,...e.sets.map(s=>parseFloat(s.weight)||0));
+      if(mw>all[k].max)all[k].max=mw;
+      all[k].cnt++;
+    }));
+    const list=Object.values(all);
+    const top=[...list].sort((a,b)=>b.cnt-a.cnt).slice(0,6);
+    return {
+      strengthEx:[...list].sort((a,b)=>a.name.localeCompare(b.name,'es')),
+      exList:top,
+      maxW:Math.max(...top.map(e=>e.max),1),
+    };
+  },[sessions,library]);
+  const selKey=strengthEx.some(e=>e.key===selEx)?selEx:(strengthEx[0]?.key||'');
+  const exHistory=useMemo(()=>sessions.slice().reverse().filter(s=>s.exercises.some(e=>exKey(e)===selKey)).map(s=>{
+    const ex=s.exercises.find(e=>exKey(e)===selKey);
+    return {date:fmtShort(s.date),maxW:Math.max(0,...ex.sets.map(s=>parseFloat(s.weight)||0))};
+  }),[sessions,selKey]);
+  const exLabels=useMemo(()=>exHistory.map(e=>e.date),[exHistory]);
+  const exData=useMemo(()=>exHistory.map(e=>e.maxW),[exHistory]);
 
   return h('div',{className:'content'},
     h('div',{className:'ptitle'},'ESTADÍSTICAS'),
@@ -1862,15 +1914,15 @@ function StatsTab({sessions}){
     exHistory.length>1&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},
         h('span',null,'Progresión de peso'),
-        h('select',{value:selName,onChange:e=>setSelEx(e.target.value),style:{height:26,fontSize:12,border:'0.5px solid var(--border2)',borderRadius:6,background:'var(--bg2)',color:'var(--t1)',fontFamily:'inherit',padding:'0 6px'}},
-          strengthExNames.map(n=>h('option',{key:n},n))
+        h('select',{value:selKey,onChange:e=>setSelEx(e.target.value),style:{height:26,fontSize:12,border:'0.5px solid var(--border2)',borderRadius:6,background:'var(--bg2)',color:'var(--t1)',fontFamily:'inherit',padding:'0 6px'}},
+          strengthEx.map(e=>h('option',{key:e.key,value:e.key},e.name))
         )
       ),
-      h(LineChart,{labels:exHistory.map(e=>e.date),data:exHistory.map(e=>e.maxW),color:'#E24B4A'})
+      h(LineChart,{labels:exLabels,data:exData,color:'#E24B4A'})
     ),
     exList.length>0&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},'Peso máximo por ejercicio'),
-      exList.map(e=>h('div',{key:e.name,style:{marginBottom:14}},
+      exList.map(e=>h('div',{key:e.key,style:{marginBottom:14}},
         h('div',{className:'rowflex'},
           h('div',null,h('span',{style:{fontSize:13,fontWeight:600,color:'var(--t1)'}},e.name),' ',h('span',{className:`tag ${MUSCLE_COLORS[e.muscle]||'tb'}`},e.muscle)),
           h('span',{style:{fontSize:13,fontWeight:600,color:'var(--t1)'}},e.max+' kg')
@@ -1907,6 +1959,38 @@ function RecTab({sessions}){
 }
 
 // ---- Backup Tab ----
+function downloadBackup({sessions,library,profile,weightLog}){
+  const payload={version:2,exportedAt:new Date().toISOString(),sessions,library,profile,weightLog};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='ironlog-backup-'+localISODate()+'.json';
+  a.click();
+  // Revocar en diferido: Safari puede cancelar la descarga si se revoca de inmediato
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+
+// Comprueba la estructura mínima que la app necesita para no romperse al renderizar
+function validateBackup(data){
+  const fail=msg=>{throw new Error('Formato inválido: '+msg);};
+  if(!data||typeof data!=='object')fail('el archivo no contiene un objeto.');
+  if(!Array.isArray(data.sessions))fail('falta la lista de sesiones.');
+  if(!Array.isArray(data.library))fail('falta la biblioteca.');
+  data.sessions.forEach((s,i)=>{
+    const n='sesión '+(i+1);
+    if(!s||isNaN(new Date(s.date).getTime()))fail(n+' sin fecha válida.');
+    if(!Array.isArray(s.exercises))fail(n+' sin lista de ejercicios.');
+    s.exercises.forEach(e=>{
+      if(!e||typeof e.name!=='string'||!Array.isArray(e.sets))fail(n+' tiene un ejercicio mal formado.');
+    });
+  });
+  data.library.forEach((e,i)=>{
+    if(!e||e.id==null||typeof e.name!=='string'||typeof e.muscle!=='string')fail('ejercicio '+(i+1)+' de la biblioteca mal formado.');
+  });
+  if(data.weightLog!=null&&!Array.isArray(data.weightLog))fail('el registro de peso no es una lista.');
+  if(data.profile!=null&&typeof data.profile!=='object')fail('el perfil no es válido.');
+}
 function BackupTab({sessions,library,profile,weightLog,onRestore,onExported}){
   const [importError,setImportError]=useState('');
   const [importOk,setImportOk]=useState(false);
@@ -1918,20 +2002,7 @@ function BackupTab({sessions,library,profile,weightLog,onRestore,onExported}){
   },[sessions,library,profile,weightLog]);
 
   function exportData(){
-    const payload={
-      version:2,
-      exportedAt:new Date().toISOString(),
-      sessions,library,profile,weightLog
-    };
-    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    const dateStr=localISODate();
-    a.download='ironlog-backup-'+dateStr+'.json';
-    a.click();
-    // Revocar en diferido: Safari puede cancelar la descarga si se revoca de inmediato
-    setTimeout(()=>URL.revokeObjectURL(url),10000);
+    downloadBackup({sessions,library,profile,weightLog});
     onExported&&onExported();
   }
 
@@ -1943,8 +2014,7 @@ function BackupTab({sessions,library,profile,weightLog,onRestore,onExported}){
     reader.onload=ev=>{
       try{
         const data=JSON.parse(ev.target.result);
-        if(!data.sessions||!Array.isArray(data.sessions))throw new Error('Formato inválido: falta la lista de sesiones.');
-        if(!data.library||!Array.isArray(data.library))throw new Error('Formato inválido: falta la biblioteca.');
+        validateBackup(data);
         const confirm=window.confirm(
           `Se van a importar:\n• ${data.sessions.length} sesiones\n• ${data.library.length} ejercicios\n\nEsto reemplazará todos los datos actuales. ¿Continuar?`
         );
@@ -2032,6 +2102,7 @@ function App(){
   useEffect(()=>saveState('il_weightlog',weightLog),[weightLog]);
 
   function addSession(s){setSessions(prev=>[s,...prev]);}
+  function deleteSession(id){setSessions(prev=>prev.filter(s=>s.id!==id));}
   function addToLibrary(ex){setLibrary(prev=>[...prev,ex]);}
   function removeFromLibrary(id){setLibrary(prev=>prev.filter(e=>e.id!==id));}
   function editLibrary(updated){setLibrary(prev=>prev.map(e=>e.id===updated.id?{...e,...updated}:e));}
@@ -2082,9 +2153,9 @@ function App(){
     h('div',{style:{display:tab==='library'?'block':'none'}},
       h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary,onEdit:editLibrary})),
     h('div',{style:{display:tab==='history'?'block':'none'}},
-      h(HistoryTab,{sessions})),
+      h(HistoryTab,{sessions,onDelete:deleteSession})),
     h('div',{style:{display:tab==='stats'?'block':'none'}},
-      h(StatsTab,{sessions})),
+      h(StatsTab,{sessions,library})),
     h('div',{style:{display:tab==='profile'?'block':'none'}},
       h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions})),
     h('div',{style:{display:tab==='backup'?'block':'none'}},
@@ -2092,7 +2163,33 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(h(App,null));
+// Si algo falla al renderizar, en vez de pantalla en blanco se muestra un aviso con opción de rescatar los datos
+class ErrorBoundary extends React.Component{
+  constructor(props){super(props);this.state={error:null};}
+  static getDerivedStateFromError(error){return {error};}
+  componentDidCatch(error,info){console.error(error,info);}
+  render(){
+    if(!this.state.error)return this.props.children;
+    const rescue=()=>downloadBackup({
+      sessions:loadState('il_sessions',[]),library:loadState('il_library',[]),
+      profile:loadState('il_profile',{}),weightLog:loadState('il_weightlog',[]),
+    });
+    return h('div',{className:'content'},
+      h('div',{className:'card'},
+        h('div',{className:'ptitle',style:{fontSize:20}},'Algo ha fallado'),
+        h('p',{style:{fontSize:13,color:'var(--t2)',lineHeight:1.6,margin:'8px 0 16px'}},
+          'Tus datos siguen guardados en el dispositivo. Descarga una copia antes de nada y después prueba a recargar.'),
+        h('pre',{style:{fontSize:11,color:'var(--t2)',whiteSpace:'pre-wrap',marginBottom:16}},String(this.state.error?.message||this.state.error)),
+        h('div',{style:{display:'flex',gap:8}},
+          h('button',{className:'btn btnp',style:{flex:1},onClick:rescue},'⬇ Descargar datos'),
+          h('button',{className:'btn btns',onClick:()=>location.reload()},'Recargar')
+        )
+      )
+    );
+  }
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(ErrorBoundary,null,h(App,null)));
 
 // Service worker para uso offline (solo funciona servido por http/https, no abriendo el archivo directamente)
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
