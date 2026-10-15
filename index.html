@@ -23,7 +23,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overscroll-behavior:none}
 body{
-  font-family:'DM Sans',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   background:#f5f4f0;
   padding-top:env(safe-area-inset-top);
   padding-bottom:env(safe-area-inset-bottom);
@@ -103,14 +103,13 @@ body{
 }
 .fg input:focus,.fg select:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 
 /* Buttons */
 .btn{
   height:44px;padding:0 18px;border-radius:10px;font-size:14px;font-weight:600;
   cursor:pointer;font-family:inherit;transition:opacity .15s;
   display:inline-flex;align-items:center;justify-content:center;gap:6px;
-  -webkit-appearance:none;
+  -webkit-appearance:none;appearance:none;
 }
 .btnp{background:var(--accent);color:#fff;border:none}
 .btnp:active{opacity:.8}
@@ -194,6 +193,17 @@ body{
 }
 .add-set-btn:active{background:var(--bg2)}
 
+/* Notices */
+.notice{margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:500;border:0.5px solid transparent}
+.notice-info{background:#E6F1FB;color:#185FA5;border-color:#378ADD}
+.notice-err{background:#FCEBEB;color:#A32D2D}
+.notice-ok{background:#EAF3DE;color:#3B6D11}
+@media(prefers-color-scheme:dark){
+  .notice-info{background:#0d2a42;color:#85B7EB;border-color:#185FA5}
+  .notice-err{background:#3a1515;color:#f09595}
+  .notice-ok{background:#152a0a;color:#97C459}
+}
+
 /* Calorie preview */
 .cal-preview{
   display:flex;align-items:center;gap:12px;padding:14px 16px;
@@ -263,11 +273,6 @@ body{
 .sde-set-reps{font-size:14px;color:var(--t1)}
 .sde-set-vol{font-size:11px;color:var(--t2);text-align:right}
 
-/* old hentry kept for compat */
-.hentry{padding:13px 0;border-bottom:0.5px solid var(--border)}
-.hentry:last-child{border-bottom:none}
-.hdate{font-size:12px;color:var(--t2);font-weight:500}
-.hmeta{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
 .sbadge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:500;background:var(--bg2);color:var(--t2);border:0.5px solid var(--border)}
 .sbadge-cal{background:#FAEEDA;color:#854F0B;border-color:#FAC775}
 @media(prefers-color-scheme:dark){.sbadge-cal{background:#2e1d04;color:#EF9F27;border-color:#854F0B}}
@@ -284,14 +289,6 @@ body{
 .lib-ex-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:0.5px solid var(--border)}
 .lib-ex-row:last-child{border-bottom:none}
 .lib-ex-name{font-size:14px;font-weight:500;color:var(--t1)}
-
-/* Rec */
-.reccard{border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:18px}
-.rectitle{font-size:14px;font-weight:600;color:var(--t1);margin-bottom:4px}
-.recbody{font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:5px}
-.recsrc{font-size:11px;color:var(--accent2);font-weight:500}
-.aibox{border:0.5px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:16px;background:var(--bg2)}
-.ailabel{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
 
 /* Modal */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:flex;align-items:flex-end;justify-content:center}
@@ -321,8 +318,6 @@ body{
 .weight-log-date{font-size:12px;color:var(--t2)}
 .weight-log-val{font-size:18px;font-weight:700;color:var(--t1)}
 .weight-log-val span{font-size:12px;font-weight:400;color:var(--t2)}
-.weight-add-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:4px}
-.weight-add-row input{flex:1;height:42px;border:0.5px solid var(--border2);border-radius:10px;padding:0 12px;font-size:16px;background:var(--bg2);color:var(--t1);font-family:inherit}
 .current-weight-badge{display:inline-flex;align-items:baseline;gap:4px;padding:8px 14px;background:var(--bg2);border-radius:10px;border:0.5px solid var(--border)}
 .current-weight-badge .w-num{font-size:28px;font-weight:800;color:var(--t1)}
 .current-weight-badge .w-unit{font-size:13px;color:var(--t2)}
@@ -512,13 +507,57 @@ function estimateStrengthCals(exercise,bw){
     return t+met*im*lf*bw*hrs;
   },0));
 }
+// MET por actividad (Compendium of Physical Activities, intensidad moderada); 7.0 para cardio personalizado
+const CARDIO_MET={carrera:9.8,bicicleta:6.8,eliptica:5.0,'remo-cardio':7.0,cuerda:11.8};
+function cardioSetMET(exercise,s){
+  const min=parseFloat(s.duration)||0, km=parseFloat(s.distance)||0;
+  // Carrera con distancia: ecuaciones metabólicas del ACSM según la velocidad (caminar por debajo de 6.5 km/h)
+  if(exercise.libraryId==='carrera'&&min>0&&km>0){
+    const mPerMin=km*1000/min, kmh=km/(min/60);
+    const vo2=(kmh>=6.5?0.2:0.1)*mPerMin+3.5;
+    return vo2/3.5;
+  }
+  return CARDIO_MET[exercise.libraryId]||7.0;
+}
 function estimateCardioCals(exercise,bw){
   if(!bw||bw<=0)return 0;
-  const min=exercise.sets.reduce((t,s)=>t+(parseFloat(s.duration)||0),0);
-  return Math.round(7.0*bw*(min/60));
+  return Math.round(exercise.sets.reduce((t,s)=>t+cardioSetMET(exercise,s)*bw*((parseFloat(s.duration)||0)/60),0));
 }
 function calcSessionCals(exercises,bw){
   return exercises.reduce((t,e)=>t+(e.isCardio?estimateCardioCals(e,bw):estimateStrengthCals(e,bw)),0);
+}
+
+// ---- Session helpers ----
+function setHasData(e,s){
+  return e.isCardio?(parseFloat(s.duration)>0||parseFloat(s.distance)>0):(parseFloat(s.weight)>0||parseInt(s.reps)>0);
+}
+function newSessionExercise(libEx){
+  return {id:Date.now(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
+    sets:libEx.isCardio?[{id:Date.now(),duration:'',distance:''}]:[{id:Date.now(),reps:'',weight:''}]};
+}
+function exerciseHasData(e){return e.sets.some(s=>s.weight||s.reps||s.duration||s.distance);}
+// Quita series vacías y ejercicios que se quedan sin series
+function cleanExercises(exercises){
+  return exercises.map(e=>({...e,sets:e.sets.filter(s=>setHasData(e,s))})).filter(e=>e.sets.length>0);
+}
+function sumSets(exercises,cardio,fn){
+  return exercises.filter(e=>!!e.isCardio===cardio).reduce((t,e)=>t+e.sets.reduce((a,s)=>a+fn(s),0),0);
+}
+function sessionTotals(exercises,bw){
+  return {
+    totalVolume:sumSets(exercises,false,s=>(parseFloat(s.weight)||0)*(parseInt(s.reps)||0)),
+    totalCardioMin:sumSets(exercises,true,s=>parseFloat(s.duration)||0),
+    totalCardioKm:sumSets(exercises,true,s=>parseFloat(s.distance)||0),
+    calories:bw>0?calcSessionCals(exercises,bw):0,
+  };
+}
+// Peso corporal registrado en una fecha (último registro anterior o igual); si no hay, el más antiguo
+function weightAt(weightLog,date){
+  if(!weightLog.length)return 0;
+  const t=new Date(date);
+  let w=weightLog[0].weight;
+  weightLog.forEach(e=>{if(parseLocalDate(e.date)<=t)w=e.weight;});
+  return w;
 }
 
 // ---- Helpers ----
@@ -534,12 +573,23 @@ function isValidDate(s){return !isNaN(parseLocalDate(s).getTime());}
 function exKey(e){return e.libraryId?'id:'+e.libraryId:'name:'+e.name;}
 
 // ---- Charts ----
+// Sigue el tema del sistema en vivo para que los gráficos se repinten al cambiar a modo oscuro/claro
+function useDarkMode(){
+  const [dark,setDark]=useState(()=>matchMedia('(prefers-color-scheme:dark)').matches);
+  useEffect(()=>{
+    const mq=matchMedia('(prefers-color-scheme:dark)');
+    const onChange=e=>setDark(e.matches);
+    mq.addEventListener('change',onChange);
+    return()=>mq.removeEventListener('change',onChange);
+  },[]);
+  return dark;
+}
 function BarChart({labels,data,color}){
   const ref=useRef(),cr=useRef();
+  const dk=useDarkMode();
   useEffect(()=>{
     if(!ref.current)return;
     if(cr.current)cr.current.destroy();
-    const dk=matchMedia('(prefers-color-scheme:dark)').matches;
     const gc=dk?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)',tc=dk?'#777':'#888';
     cr.current=new Chart(ref.current,{
       type:'bar',
@@ -549,25 +599,25 @@ function BarChart({labels,data,color}){
                 y:{grid:{color:gc},ticks:{color:tc,font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(1)+'k':v}}}}
     });
     return()=>{if(cr.current)cr.current.destroy()};
-  },[labels,data,color]);
+  },[labels,data,color,dk]);
   return h('div',{className:'chartw'},h('canvas',{ref}));
 }
-function LineChart({labels,data,color}){
+function LineChart({labels,data,color,unit}){
   const ref=useRef(),cr=useRef();
+  const dk=useDarkMode();
   useEffect(()=>{
     if(!ref.current)return;
     if(cr.current)cr.current.destroy();
-    const dk=matchMedia('(prefers-color-scheme:dark)').matches;
     const gc=dk?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)',tc=dk?'#777':'#888';
     cr.current=new Chart(ref.current,{
       type:'line',
       data:{labels,datasets:[{data,borderColor:color||'#378ADD',backgroundColor:(color||'#378ADD')+'25',fill:true,tension:.35,pointBackgroundColor:color||'#378ADD',pointRadius:4}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
         scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}},
-                y:{grid:{color:gc},ticks:{color:tc,font:{size:10}}}}}
+                y:{grid:{color:gc},ticks:{color:tc,font:{size:10},...(unit?{callback:v=>v+' '+unit}:{})}}}}
     });
     return()=>{if(cr.current)cr.current.destroy()};
-  },[labels,data,color]);
+  },[labels,data,color,unit,dk]);
   return h('div',{className:'chartw'},h('canvas',{ref}));
 }
 
@@ -601,7 +651,7 @@ function ExercisePicker({library,onSelect,onCreateNew}){
           h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle)
         ))
       )),
-      h('div',{className:'picker-new-row',onClick:()=>{setOpen(false);onCreateNew(query);}},
+      onCreateNew&&h('div',{className:'picker-new-row',onClick:()=>{setOpen(false);onCreateNew(query);}},
         h('span',{style:{fontSize:18,lineHeight:1}},'+'),
         h('span',null,query?`Crear "${query}"...`:'Añadir ejercicio nuevo')
       )
@@ -697,25 +747,13 @@ function ExerciseBlock({ex,onChange,onRemove,bw,prevSets=[]}){
             const prPlaceholder=prev.reps?String(prev.reps):'reps';
             return h('div',{key:s.id,className:'series-row strength',style:{position:'relative'}},
               h('div',{className:'series-num'},'#'+(i+1)),
-              h('div',{style:{position:'relative'}},
-                // Ghost value shown when input is empty
-                !s.weight&&prev.weight&&h('div',{style:{
-                  position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:14,color:'var(--t2)',opacity:.38,pointerEvents:'none',fontWeight:500,
-                }},prev.weight),
-                h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.5,
-                  placeholder:pwPlaceholder,value:s.weight,
-                  onChange:e=>updSet(i,'weight',e.target.value)})
-              ),
-              h('div',{style:{position:'relative'}},
-                !s.reps&&prev.reps&&h('div',{style:{
-                  position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:14,color:'var(--t2)',opacity:.38,pointerEvents:'none',fontWeight:500,
-                }},prev.reps),
-                h('input',{className:'series-input',type:'number',inputMode:'numeric',min:1,
-                  placeholder:prPlaceholder,value:s.reps,
-                  onChange:e=>updSet(i,'reps',e.target.value)})
-              ),
+              // El valor de la sesión anterior se muestra como placeholder
+              h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.5,
+                placeholder:pwPlaceholder,value:s.weight,
+                onChange:e=>updSet(i,'weight',e.target.value)}),
+              h('input',{className:'series-input',type:'number',inputMode:'numeric',min:1,
+                placeholder:prPlaceholder,value:s.reps,
+                onChange:e=>updSet(i,'reps',e.target.value)}),
               ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null)
             );
           }),
@@ -832,7 +870,8 @@ const ACHIEVEMENTS=[
 ];
 
 function AchievementsSection({sessions}){
-  const evaluated=ACHIEVEMENTS.map(a=>({...a,unlocked:a.check(sessions),progress:a.prog(sessions)}));
+  // Cada logro recorre todo el historial: recalcular solo cuando cambian las sesiones
+  const evaluated=useMemo(()=>ACHIEVEMENTS.map(a=>({...a,unlocked:a.check(sessions),progress:a.prog(sessions)})),[sessions]);
   const unlocked=evaluated.filter(a=>a.unlocked).length;
   const cats=[...new Set(ACHIEVEMENTS.map(a=>a.cat))];
 
@@ -905,35 +944,12 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
   const [draft,setDraft]=useState(profile);
   const [newWeight,setNewWeight]=useState('');
   const [newWeightDate,setNewWeightDate]=useState(()=>localISODate());
-  const chartRef=useRef(); const chartObj=useRef();
   const todayISO=localISODate();
 
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:null;
-  const sortedLog=[...weightLog].sort((a,b)=>parseLocalDate(a.date)-parseLocalDate(b.date));
-
-  // Weight chart
-  useEffect(()=>{
-    if(!chartRef.current||sortedLog.length<2)return;
-    if(chartObj.current)chartObj.current.destroy();
-    const dk=matchMedia('(prefers-color-scheme:dark)').matches;
-    const gc=dk?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
-    const tc=dk?'#777':'#888';
-    chartObj.current=new Chart(chartRef.current,{
-      type:'line',
-      data:{
-        labels:sortedLog.map(e=>parseLocalDate(e.date).toLocaleDateString('es-ES',{day:'numeric',month:'short'})),
-        datasets:[{
-          data:sortedLog.map(e=>e.weight),
-          borderColor:'#378ADD',backgroundColor:'#378ADD22',
-          fill:true,tension:.35,pointBackgroundColor:'#378ADD',pointRadius:4
-        }]
-      },
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-        scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}},
-                y:{grid:{color:gc},ticks:{color:tc,font:{size:10},callback:v=>v+' kg'}}}}
-    });
-    return()=>{if(chartObj.current)chartObj.current.destroy();};
-  },[sortedLog.length]);
+  const sortedLog=useMemo(()=>[...weightLog].sort((a,b)=>parseLocalDate(a.date)-parseLocalDate(b.date)),[weightLog]);
+  const chartLabels=useMemo(()=>sortedLog.map(e=>fmtShort(parseLocalDate(e.date))),[sortedLog]);
+  const chartData=useMemo(()=>sortedLog.map(e=>e.weight),[sortedLog]);
 
   function saveProfile(){
     if(!draft.sex){alert('Selecciona el sexo');return;}
@@ -1011,7 +1027,7 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
     // Weight chart
     sortedLog.length>=2&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},'Evolución del peso'),
-      h('div',{style:{position:'relative',height:200}},h('canvas',{ref:chartRef}))
+      h(LineChart,{labels:chartLabels,data:chartData,color:'#378ADD',unit:'kg'})
     ),
 
     // Weight history list
@@ -1046,7 +1062,6 @@ const Icons={
   library:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14M9 3v16M4 7h5M4 11h5M4 15h5'})),
   history:()=>h('svg',{viewBox:'0 0 24 24'},h('circle',{cx:12,cy:12,r:9}),h('path',{d:'M12 7v5l3 3'})),
   stats:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M3 3v18h18'}),h('path',{d:'M7 16l4-4 4 4 5-5'})),
-  rec:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V9l-6-6z'}),h('path',{d:'M9 3v6h6M12 11v6M9 14h6'})),
 };
 
 // Map app muscle groups → body-region keys
@@ -1379,6 +1394,33 @@ function fmtDuration(secs){
 }
 
 const DRAFT_KEY='il_draft';
+const INACTIVITY_MS=15*60*1000;
+
+// Cronómetro aislado: solo este componente se repinta cada segundo, no toda la pestaña.
+// Detecta la inactividad y avisa al padre con onAutoPause(momento en que se congela).
+function WorkoutTimer({timerStart,lastActivity,pausedAt,onAutoPause}){
+  // Si ya se superó la inactividad (p.ej. borrador recuperado horas después), mostrar el tiempo congelado
+  const endAt=()=>pausedAt||Math.min(Date.now(),lastActivity+INACTIVITY_MS);
+  const [elapsed,setElapsed]=useState(()=>Math.max(0,Math.floor((endAt()-timerStart)/1000)));
+  useEffect(()=>{
+    const tick=()=>{
+      if(!pausedAt&&Date.now()-lastActivity>INACTIVITY_MS){onAutoPause(lastActivity+INACTIVITY_MS);return false;}
+      setElapsed(Math.max(0,Math.floor((endAt()-timerStart)/1000)));
+      return true;
+    };
+    if(!tick()||pausedAt)return;
+    const id=setInterval(tick,1000);
+    return()=>clearInterval(id);
+  },[timerStart,lastActivity,pausedAt]);
+
+  return h('div',{className:'workout-timer',style:pausedAt?{borderColor:'#BA7517'}:{}},
+    pausedAt
+      ? h('div',{style:{width:8,height:8,borderRadius:'50%',background:'#BA7517',flexShrink:0}})
+      : h('div',{className:'timer-dot'}),
+    h('div',{className:'timer-display',style:pausedAt?{color:'#BA7517'}:{}},fmtDuration(elapsed)),
+    h('div',{className:'timer-label'},pausedAt?'Pausado por inactividad':'Tiempo de sesión')
+  );
+}
 
 function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary,onActiveSessionChange}){
   const [exercises,setExercises]=useState(()=>{
@@ -1397,7 +1439,6 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   const [showNewEx,setShowNewEx]=useState(false);
   const [newExName,setNewExName]=useState('');
   const [completedSession,setCompletedSession]=useState(null);
-  const [elapsed,setElapsed]=useState(timerStart?Math.floor(((pausedAt||Date.now())-timerStart)/1000):0);
   const [draftBanner,setDraftBanner]=useState(()=>{
     try{
       const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
@@ -1409,7 +1450,6 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     return null;
   });
   const bottomRef=useRef();
-  const timerRef=useRef();
   const firstRender=useRef(true);
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
   const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
@@ -1423,8 +1463,6 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     }));
     return {byKey,byName};
   },[sessions]);
-
-  const INACTIVITY_MS=15*60*1000;
 
   // Autosave draft whenever relevant state changes
   useEffect(()=>{
@@ -1442,11 +1480,10 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   useEffect(()=>{
     if(exercises.length===1&&!timerStart){
       const start=Date.now();
-      setTimerStart(start);setLastActivity(start);setPausedAt(null);setElapsed(0);
+      setTimerStart(start);setLastActivity(start);setPausedAt(null);
     }
     if(exercises.length===0){
-      clearInterval(timerRef.current);
-      setTimerStart(null);setPausedAt(null);setElapsed(0);
+      setTimerStart(null);setPausedAt(null);
     }
   },[exercises.length]);
 
@@ -1463,60 +1500,31 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     }
   },[exercises]);
 
-  // Tick every second: update display + check inactivity threshold
-  useEffect(()=>{
-    if(!timerStart)return;
-    timerRef.current=setInterval(()=>{
-      const now=Date.now();
-      if(!pausedAt&&now-lastActivity>INACTIVITY_MS){
-        const freeze=lastActivity+INACTIVITY_MS;
-        setPausedAt(freeze);
-        setElapsed(Math.floor((freeze-timerStart)/1000));
-        return;
-      }
-      if(pausedAt){
-        setElapsed(Math.floor((pausedAt-timerStart)/1000));
-      } else {
-        setElapsed(Math.floor((now-timerStart)/1000));
-      }
-    },1000);
-    return()=>clearInterval(timerRef.current);
-  },[timerStart,lastActivity,pausedAt]);
-
   function selectFromLibrary(libEx){
     setDraftBanner(null);
-    setExercises(prev=>[...prev,{id:Date.now(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
-      sets:libEx.isCardio?[{id:Date.now(),duration:'',distance:''}]:[{id:Date.now(),reps:'',weight:''}]}]);
+    setExercises(prev=>[...prev,newSessionExercise(libEx)]);
     // Scroll to bottom after render
     setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth',block:'end'}),80);
   }
   function saveNewToLibrary(libEx){onAddToLibrary(libEx);selectFromLibrary(libEx);}
   function discardSession(){
     if(!confirm('¿Descartar la sesión actual? Se perderán todos los ejercicios y series.'))return;
-    clearInterval(timerRef.current);
-    setExercises([]);setTimerStart(null);setPausedAt(null);setElapsed(0);
+    setExercises([]);setTimerStart(null);setPausedAt(null);
     setDraftBanner(null);
     localStorage.removeItem(DRAFT_KEY);
   }
   function save(){
     if(!exercises.length){alert('Añade al menos un ejercicio');return;}
-    // Quitar series vacías y ejercicios que se queden sin series
-    const setHasData=(e,s)=>e.isCardio?(parseFloat(s.duration)>0||parseFloat(s.distance)>0):(parseFloat(s.weight)>0||parseInt(s.reps)>0);
-    const cleaned=exercises.map(e=>({...e,sets:e.sets.filter(s=>setHasData(e,s))})).filter(e=>e.sets.length>0);
+    const cleaned=cleanExercises(exercises);
     if(!cleaned.length){alert('No hay ninguna serie con datos. Rellena al menos una serie antes de guardar.');return;}
     const dropped=exercises.length-cleaned.length;
     const msg='¿Terminar y guardar la sesión?'+(dropped>0?'\n\nSe ignorará'+(dropped>1?'n ':' ')+dropped+' ejercicio'+(dropped>1?'s':'')+' sin datos.':'');
     if(!confirm(msg))return;
-    clearInterval(timerRef.current);
     const realEnd=pausedAt||Date.now();
     const durationSecs=timerStart?Math.floor((realEnd-timerStart)/1000):0;
-    const cal=currentWeight>0?calcSessionCals(cleaned,currentWeight):0;
-    const vol=cleaned.filter(e=>!e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.weight)||0)*(parseInt(set.reps)||0),0),0);
-    const cardioMin=cleaned.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.duration)||0),0),0);
-    const cardioKm=cleaned.filter(e=>e.isCardio).reduce((t,e)=>t+e.sets.reduce((s,set)=>s+(parseFloat(set.distance)||0),0),0);
-    const session={id:Date.now(),date:new Date().toISOString(),exercises:cleaned,totalVolume:vol,totalCardioMin:cardioMin,totalCardioKm:cardioKm,calories:cal,durationSecs};
+    const session={id:Date.now(),date:new Date().toISOString(),exercises:cleaned,...sessionTotals(cleaned,currentWeight),durationSecs};
     onSave(session);
-    setExercises([]);setTimerStart(null);setPausedAt(null);setElapsed(0);
+    setExercises([]);setTimerStart(null);setPausedAt(null);
     setDraftBanner(null);
     localStorage.removeItem(DRAFT_KEY);
     setCompletedSession(session);
@@ -1528,24 +1536,16 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     h('div',{className:'psub'},new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})),
     h(ProfileBanner,{profile,weightLog,onGoToProfile}),
     // Draft recovery banner
-    draftBanner&&exercises.length>0&&h('div',{style:{
-      display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,
-      padding:'10px 14px',background:'#E6F1FB',border:'0.5px solid #378ADD',
-      borderRadius:10,marginBottom:12,fontSize:13,
+    draftBanner&&exercises.length>0&&h('div',{className:'notice notice-info',style:{
+      display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginTop:0,marginBottom:12,
     }},
-      h('span',{style:{color:'#185FA5',fontWeight:500}},'📋 Borrador recuperado del '+draftBanner),
+      h('span',null,'📋 Borrador recuperado del '+draftBanner),
       h('button',{onClick:discardSession,style:{
-        background:'transparent',border:'none',color:'#185FA5',cursor:'pointer',
+        background:'transparent',border:'none',color:'inherit',cursor:'pointer',
         fontFamily:'inherit',fontSize:12,fontWeight:600,padding:0,textDecoration:'underline',
       }},'Descartar')
     ),
-    timerStart&&h('div',{className:'workout-timer',style:pausedAt?{borderColor:'#BA7517'}:{}},
-      pausedAt
-        ? h('div',{style:{width:8,height:8,borderRadius:'50%',background:'#BA7517',flexShrink:0}})
-        : h('div',{className:'timer-dot'}),
-      h('div',{className:'timer-display',style:pausedAt?{color:'#BA7517'}:{}},fmtDuration(elapsed)),
-      h('div',{className:'timer-label'},pausedAt?'Pausado por inactividad':'Tiempo de sesión')
-    ),
+    timerStart&&h(WorkoutTimer,{timerStart,lastActivity,pausedAt,onAutoPause:setPausedAt}),
     exercises.length>0&&estTotal!==null&&h('div',{className:'cal-preview'},
       h('div',null,h('div',{className:'kcal-num'},'🔥 '+estTotal+' kcal'),h('div',{className:'kcal-sub'},'estimadas esta sesión'),h('div',{className:'kcal-note'},'Se actualiza en tiempo real'))
     ),
@@ -1559,8 +1559,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
         const prevSets=prevSetsMap.byKey[exKey(e)]||prevSetsMap.byName[e.name]||[];
         return h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>{
           // Solo pedimos confirmación si hay datos que perder
-          const hasData=e.sets.some(s=>s.weight||s.reps||s.duration||s.distance);
-          if(hasData&&!confirm('¿Eliminar "'+e.name+'" y todas sus series?'))return;
+          if(exerciseHasData(e)&&!confirm('¿Eliminar "'+e.name+'" y todas sus series?'))return;
           setExercises(prev=>prev.filter((_,j)=>j!==i));
         },bw:currentWeight,prevSets});
       })
@@ -1648,7 +1647,7 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
 }
 
 // ---- History Tab ----
-function SessionDetail({session,onDelete}){
+function SessionDetail({session,onDelete,onEdit}){
   return h('div',{className:'session-detail'},
     // Stats strip
     h('div',{className:'session-detail-stats'},
@@ -1702,19 +1701,69 @@ function SessionDetail({session,onDelete}){
             )
       ))
     ),
-    h('div',{style:{display:'flex',justifyContent:'flex-end',marginTop:14}},
-      h('button',{className:'btnd',onClick:()=>{
+    h('div',{style:{display:'flex',justifyContent:'flex-end',gap:8,marginTop:14}},
+      h('button',{className:'btn btns btnsm',onClick:onEdit},'Editar'),
+      h('button',{className:'btnd',style:{height:34},onClick:()=>{
         if(confirm('¿Eliminar la sesión del '+fmtDate(session.date)+'? Esta acción no se puede deshacer.'))onDelete(session.id);
       }},'Eliminar sesión')
     )
   );
 }
 
-function HistoryTab({sessions,onDelete}){
+function SessionEditModal({session,library,weightLog,onSave,onClose}){
+  const [exercises,setExercises]=useState(()=>session.exercises.map(e=>({...e,sets:e.sets.map(s=>({...s}))})));
+  // Las calorías se recalculan con el peso corporal registrado en la fecha de la sesión
+  const bw=weightAt(weightLog,session.date);
+
+  function save(){
+    const cleaned=cleanExercises(exercises);
+    if(!cleaned.length){alert('La sesión no tiene ninguna serie con datos. Si quieres quitarla, usa "Eliminar sesión".');return;}
+    const totals=sessionTotals(cleaned,bw);
+    if(!bw)totals.calories=session.calories||0; // sin registro de peso no se puede recalcular: conservar el valor guardado
+    onSave({...session,exercises:cleaned,...totals});
+    onClose();
+  }
+
+  // Sin cierre al tocar el fondo: se perderían los cambios por accidente
+  return h('div',{className:'overlay'},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modaltitle',style:{marginBottom:4}},'Editar sesión'),
+      h('div',{className:'psub'},fmtDate(session.date)),
+      exercises.map((e,i)=>h(ExerciseBlock,{key:e.id,ex:e,bw,
+        onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),
+        onRemove:()=>{
+          if(exerciseHasData(e)&&!confirm('¿Eliminar "'+e.name+'" de esta sesión?'))return;
+          setExercises(prev=>prev.filter((_,j)=>j!==i));
+        }})),
+      h('div',{style:{margin:'12px 0'}},
+        h(ExercisePicker,{library,onSelect:libEx=>setExercises(prev=>[...prev,newSessionExercise(libEx)])})
+      ),
+      h('div',{style:{display:'flex',gap:8,marginTop:8}},
+        h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar cambios'),
+        h('button',{className:'btn btns',onClick:onClose},'Cancelar')
+      )
+    )
+  );
+}
+
+function HistoryTab({sessions,library,weightLog,onDelete,onUpdate}){
   const [openId,setOpenId]=useState(null);
-  function toggle(id){setOpenId(prev=>prev===id?null:id);}
+  const [editing,setEditing]=useState(null);
+  // El detalle solo se monta para las sesiones que se han abierto alguna vez (antes se pintaba el de todas)
+  const [mounted,setMounted]=useState(()=>new Set());
+  function toggle(id){
+    if(openId===id){setOpenId(null);return;}
+    if(!mounted.has(id)){
+      // Montar el detalle cerrado y forzar un reflow para que la transición de apertura parta de ese estado
+      ReactDOM.flushSync(()=>setMounted(prev=>new Set(prev).add(id)));
+      void document.body.offsetHeight;
+    }
+    setOpenId(id);
+  }
 
   return h('div',{className:'content'},
+    editing&&h(SessionEditModal,{session:editing,library,weightLog,onSave:onUpdate,onClose:()=>setEditing(null)}),
     h('div',{className:'ptitle'},'HISTORIAL'),
     h('div',{className:'psub'},'Todas tus sesiones'),
     sessions.length===0
@@ -1742,10 +1791,10 @@ function HistoryTab({sessions,onDelete}){
                 )
               )
             ),
-            // Expandable detail — always rendered, animated with grid-template-rows
+            // Expandable detail — animated with grid-template-rows
             h('div',{className:'session-detail-wrap'},
               h('div',{className:'session-detail-wrap-inner'},
-                h(SessionDetail,{session:s,onDelete})
+                mounted.has(s.id)&&h(SessionDetail,{session:s,onDelete,onEdit:()=>setEditing(s)})
               )
             )
           );
@@ -1933,31 +1982,6 @@ function StatsTab({sessions,library}){
   );
 }
 
-// ---- Rec Tab ----
-function RecTab({sessions}){
-  const last7=sessions.filter(s=>new Date(s.date)>=new Date(Date.now()-7*864e5)).length;
-  const muscles={};sessions.forEach(s=>s.exercises.filter(e=>!e.isCardio).forEach(e=>{muscles[e.muscle]=(muscles[e.muscle]||0)+e.sets.length;}));
-  const sorted=Object.entries(muscles).sort((a,b)=>b[1]-a[1]);
-  const top=sorted[0]?sorted[0][0]:null,lacking=sorted.length>1?sorted[sorted.length-1][0]:null;
-  const avgCal=sessions.length?Math.round(sessions.reduce((s,x)=>s+(x.calories||0),0)/sessions.length):0;
-  const analysis=sessions.length===0?'Registra al menos una sesión para análisis personalizado.'
-    :`${sessions.length} sesiones registradas. Esta semana: ${last7}.${top?' Grupo más trabajado: '+top+'.':''}${lacking&&lacking!==top?' Considera más trabajo en '+lacking+'.':''} ${avgCal>0?'Media de '+avgCal+' kcal/sesión.':''} ${last7>=3?'Buen ritmo — cuida descanso y nutrición.':'Apunta a 3-4 sesiones semanales para optimizar adaptaciones.'}`;
-  const recs=[
-    {t:'Sobrecarga progresiva',b:'Incrementar gradualmente el estímulo (peso, volumen o densidad) es imprescindible para continuar adaptaciones neuromusculares. Un aumento del 2-5% semanal es suficiente.',s:'Schoenfeld BJ et al. — Strength & Conditioning Research, 2017',c:'#378ADD'},
-    {t:'Volumen semanal óptimo',b:'10-20 series semanales por grupo muscular para hipertrofia en intermedios. Distribuir en 2-3 sesiones maximiza la síntesis proteica muscular.',s:'Krieger JW — J. Strength & Conditioning, 2010',c:'#378ADD'},
-    {t:'Rangos de repetición',b:'La hipertrofia ocurre en un rango amplio (6-30 reps) cerca del fallo muscular. La fuerza máxima mejora con cargas >75% 1RM. Periodizar entre bloques es la estrategia más efectiva.',s:'Schoenfeld BJ et al. — Journal of Human Kinetics, 2017',c:'#378ADD'},
-    {t:'Descanso entre series',b:'Para fuerza: 3-5 min. Para hipertrofia: 1-3 min es suficiente. Prioriza la calidad técnica sobre acortar el descanso.',s:'Grgic J et al. — Sports Medicine, 2017',c:'#639922'},
-    {t:'Sueño y supercompensación',b:'48-72h de recuperación por grupo muscular entre sesiones intensas. En sueño profundo se secreta ~70% de la GH diaria. La privación crónica reduce la síntesis proteica hasta un 18%.',s:'Dattilo M et al. — Medical Hypotheses, 2011',c:'#639922'},
-    {t:'Nutrición peri-entrenamiento',b:'20-40g de proteína de calidad en las 2h post-entrenamiento maximizan la síntesis proteica. Carbohidratos (0.5-1g/kg) aceleran la resíntesis de glucógeno. El balance proteico diario total es más determinante que el timing exacto.',s:'Schoenfeld BJ & Aragon AA — JISSN, 2018',c:'#BA7517'},
-  ];
-  return h('div',{className:'content'},
-    h('div',{className:'ptitle'},'RECOMENDACIONES'),
-    h('div',{className:'psub'},'Basadas en evidencia científica'),
-    h('div',{className:'aibox'},h('div',{className:'ailabel'},'Análisis de tu entrenamiento'),h('p',{style:{fontSize:13,color:'var(--t1)',lineHeight:1.65}},analysis)),
-    recs.map(r=>h('div',{key:r.t,className:'reccard',style:{borderLeftColor:r.c}},h('div',{className:'rectitle'},r.t),h('div',{className:'recbody'},r.b),h('div',{className:'recsrc'},r.s)))
-  );
-}
-
 // ---- Backup Tab ----
 function downloadBackup({sessions,library,profile,weightLog}){
   const payload={version:2,exportedAt:new Date().toISOString(),sessions,library,profile,weightLog};
@@ -2060,8 +2084,8 @@ function BackupTab({sessions,library,profile,weightLog,onRestore,onExported}){
       h('button',{className:'btn btns',style:{width:'100%'},onClick:()=>fileRef.current.click()},
         '⬆ Seleccionar archivo de copia'
       ),
-      importError&&h('div',{style:{marginTop:10,padding:'10px 14px',background:'#FCEBEB',borderRadius:8,fontSize:13,color:'#A32D2D',fontWeight:500}},importError),
-      importOk&&h('div',{style:{marginTop:10,padding:'10px 14px',background:'#EAF3DE',borderRadius:8,fontSize:13,color:'#3B6D11',fontWeight:500}},'✅ Datos importados correctamente.')
+      importError&&h('div',{className:'notice notice-err'},importError),
+      importOk&&h('div',{className:'notice notice-ok'},'✅ Datos importados correctamente.')
     ),
 
     h('div',{className:'card'},
@@ -2103,6 +2127,7 @@ function App(){
 
   function addSession(s){setSessions(prev=>[s,...prev]);}
   function deleteSession(id){setSessions(prev=>prev.filter(s=>s.id!==id));}
+  function updateSession(updated){setSessions(prev=>prev.map(s=>s.id===updated.id?updated:s));}
   function addToLibrary(ex){setLibrary(prev=>[...prev,ex]);}
   function removeFromLibrary(id){setLibrary(prev=>prev.filter(e=>e.id!==id));}
   function editLibrary(updated){setLibrary(prev=>prev.map(e=>e.id===updated.id?{...e,...updated}:e));}
@@ -2153,7 +2178,7 @@ function App(){
     h('div',{style:{display:tab==='library'?'block':'none'}},
       h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary,onEdit:editLibrary})),
     h('div',{style:{display:tab==='history'?'block':'none'}},
-      h(HistoryTab,{sessions,onDelete:deleteSession})),
+      h(HistoryTab,{sessions,library,weightLog,onDelete:deleteSession,onUpdate:updateSession})),
     h('div',{style:{display:tab==='stats'?'block':'none'}},
       h(StatsTab,{sessions,library})),
     h('div',{style:{display:tab==='profile'?'block':'none'}},
