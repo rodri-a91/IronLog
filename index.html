@@ -516,8 +516,12 @@ function migrateExercise(e){
 function migrateSessions(sessions){
   return sessions.map(s=>({...s,exercises:s.exercises.map(migrateExercise)}));
 }
+// Renombra a los nombres actuales y añade los ejercicios por defecto que falten: la biblioteca se guarda
+// entera en el dispositivo y los por defecto no se pueden borrar, así que uno ausente es uno nuevo
 function migrateLibrary(library){
-  return library.map(e=>DEFAULT_BY_ID[e.id]&&LEGACY_NAMES[e.id]?.includes(e.name)?{...e,name:DEFAULT_BY_ID[e.id].name}:e);
+  const migrated=library.map(e=>DEFAULT_BY_ID[e.id]&&LEGACY_NAMES[e.id]?.includes(e.name)?{...e,name:DEFAULT_BY_ID[e.id].name}:e);
+  const ids=new Set(migrated.map(e=>e.id));
+  return [...migrated,...DEFAULT_LIBRARY.filter(e=>!ids.has(e.id))];
 }
 
 // ---- Local Storage ----
@@ -600,6 +604,23 @@ function weightAt(weightLog,date){
 
 // ---- Helpers ----
 function today(){return new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+// Fecha local actual que se actualiza a medianoche y al volver a la app (iOS congela los timers en segundo plano)
+function useCurrentDay(){
+  const [day,setDay]=useState(()=>localISODate());
+  useEffect(()=>{
+    const check=()=>setDay(localISODate());
+    let t;
+    const schedule=()=>{
+      const n=new Date();
+      const next=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1);
+      t=setTimeout(()=>{check();schedule();},next-n+1000);
+    };
+    schedule();
+    document.addEventListener('visibilitychange',check);
+    return()=>{clearTimeout(t);document.removeEventListener('visibilitychange',check);};
+  },[]);
+  return day;
+}
 function fmtDate(d){return new Date(d).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
 function fmtShort(d){return new Date(d).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
 // Fecha local "YYYY-MM-DD" (toISOString() da el día UTC, que entre 00:00 y 02:00 en España es ayer)
@@ -990,6 +1011,12 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
   const [newWeight,setNewWeight]=useState('');
   const [newWeightDate,setNewWeightDate]=useState(()=>localISODate());
   const todayISO=localISODate();
+  // Si cambia el día con la fecha en "hoy", seguir en hoy (no dejarla en ayer)
+  const prevToday=useRef(todayISO);
+  useEffect(()=>{
+    if(newWeightDate===prevToday.current)setNewWeightDate(todayISO);
+    prevToday.current=todayISO;
+  },[todayISO]);
 
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:null;
   const sortedLog=useMemo(()=>[...weightLog].sort((a,b)=>parseLocalDate(a.date)-parseLocalDate(b.date)),[weightLog]);
@@ -1625,6 +1652,11 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
   const [editingEx,setEditingEx]=useState(null); // {id, name, muscle}
   const usageMap=useMemo(()=>{const m={};sessions.forEach(s=>s.exercises.forEach(e=>{if(e.libraryId)m[e.libraryId]=(m[e.libraryId]||0)+1;}));return m;},[sessions]);
   const filtered=filter==='Todos'?library:library.filter(e=>e.muscle===filter);
+  // Un ejercicio con sesiones no puede pasar de fuerza a cardio (o al revés): su historial tiene
+  // series de otro tipo (peso/reps frente a minutos/km) y mezclaría estadísticas y referencias
+  const editOrig=editingEx&&library.find(e=>e.id===editingEx.id);
+  const typeLocked=!!(editOrig&&usageMap[editOrig.id]);
+  const muscleOptions=!typeLocked?MUSCLES:MUSCLES.filter(m=>(m==='Cardio')===!!editOrig.isCardio);
 
   function saveEdit(){
     if(!editingEx.name.trim()){alert('El nombre no puede estar vacío');return;}
@@ -1649,9 +1681,13 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
         ),
         h('div',{className:'fg'},
           h('label',null,'Grupo muscular'),
-          h('select',{value:editingEx.muscle,onChange:e=>setEditingEx({...editingEx,muscle:e.target.value,isCardio:e.target.value==='Cardio'})},
-            MUSCLES.map(m=>h('option',{key:m},m))
-          )
+          h('select',{value:editingEx.muscle,disabled:muscleOptions.length===1,onChange:e=>setEditingEx({...editingEx,muscle:e.target.value,isCardio:e.target.value==='Cardio'})},
+            muscleOptions.map(m=>h('option',{key:m},m))
+          ),
+          typeLocked&&h('div',{style:{fontSize:11,color:'var(--t2)',marginTop:2}},
+            editOrig.isCardio
+              ?'Tiene sesiones registradas: no puede pasar a ser de fuerza.'
+              :'Tiene sesiones registradas: no puede pasar a ser de cardio.')
         ),
         h('div',{style:{display:'flex',gap:8,marginTop:8}},
           h('button',{className:'btn btnp',style:{flex:1},onClick:saveEdit},'Guardar cambios'),
@@ -1932,10 +1968,10 @@ function statsBuckets(period,now=new Date()){
   });
 }
 
-function StatsTab({sessions,library}){
+function StatsTab({sessions,library,day}){
   const [period,setPeriod]=useState('week');
   const [selEx,setSelEx]=useState('');
-  const buckets=useMemo(()=>statsBuckets(period),[period,sessions]);
+  const buckets=useMemo(()=>statsBuckets(period),[period,sessions,day]);
   const cutoff=buckets[0].from;
   const filtered=useMemo(()=>sessions.filter(s=>new Date(s.date)>=cutoff),[sessions,cutoff]);
   const totalVol=filtered.reduce((s,x)=>s+x.totalVolume,0);
@@ -2146,6 +2182,8 @@ function repairWeightLog(log){
 
 // ---- App Root ----
 function App(){
+  // Al cambiar de día se repinta todo (fecha superior, "HOY", calendario, estadísticas)
+  const day=useCurrentDay();
   const [tab,setTab]=useState('workout');
   const [sessions,setSessions]=useState(()=>migrateSessions(loadState('il_sessions',[])));
   const [library,setLibrary]=useState(()=>migrateLibrary(loadState('il_library',DEFAULT_LIBRARY)));
@@ -2217,7 +2255,7 @@ function App(){
     h('div',{style:{display:tab==='history'?'block':'none'}},
       h(HistoryTab,{sessions,library,weightLog,onDelete:deleteSession,onUpdate:updateSession})),
     h('div',{style:{display:tab==='stats'?'block':'none'}},
-      h(StatsTab,{sessions,library})),
+      h(StatsTab,{sessions,library,day})),
     h('div',{style:{display:tab==='profile'?'block':'none'}},
       h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions})),
     h('div',{style:{display:tab==='backup'?'block':'none'}},
