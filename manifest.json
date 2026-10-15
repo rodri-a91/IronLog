@@ -1,0 +1,13 @@
+{
+  "name": "IronLog",
+  "short_name": "IronLog",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a1a18",
+  "theme_color": "#E24B4A",
+  "lang": "es",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
