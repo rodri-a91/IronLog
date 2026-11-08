@@ -101,6 +101,10 @@ body{
   padding:0 12px;font-size:16px;/* 16px prevents iOS zoom */
   background:var(--bg2);color:var(--t1);font-family:inherit;width:100%;
 }
+/* iOS: el date nativo tiene un ancho mínimo propio y se sale del contenedor */
+.fg{min-width:0}
+.fg input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;display:flex;align-items:center}
+.fg input[type=date]::-webkit-date-and-time-value{text-align:left}
 .fg input:focus,.fg select:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
