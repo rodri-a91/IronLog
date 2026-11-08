@@ -419,14 +419,15 @@ body{
 .sc-map-side{text-align:center}
 .sc-map-side-label{font-size:10px;color:var(--t2);margin-top:6px;font-weight:500}
 
-/* Body map: placas musculares separadas por un trazo del color de la tarjeta */
-:root{--bm-sil:#ebe8e1;--bm-l0:#dedad1;--bm-l1:#F7C1C1;--bm-l2:#EE8A89;--bm-l3:#E24B4A;--bm-l4:#A32D2D}
+/* Body map: silueta continua con los músculos encima, separados por líneas finas */
+:root{--bm-sil:#dcd8cf;--bm-l0:#cbc6bb;--bm-line:#f4f2ec;--bm-l1:#F7C1C1;--bm-l2:#EE8A89;--bm-l3:#E24B4A;--bm-l4:#A32D2D}
 @media(prefers-color-scheme:dark){
   /* En oscuro la intensidad sube en luminosidad: más series = más claro */
-  :root{--bm-sil:#33322f;--bm-l0:#3d3c38;--bm-l1:#762d2d;--bm-l2:#b23434;--bm-l3:#E24B4A;--bm-l4:#ffa3a2}
+  :root{--bm-sil:#43423e;--bm-l0:#53524d;--bm-line:#2a2927;--bm-l1:#762d2d;--bm-l2:#b23434;--bm-l3:#E24B4A;--bm-l4:#ffa3a2}
 }
 .bm{display:block}
-.bm path,.bm rect,.bm ellipse{stroke:var(--card);stroke-width:1.2;stroke-linejoin:round}
+.bm path,.bm rect,.bm ellipse{stroke:var(--bm-line);stroke-width:.9;stroke-linejoin:round}
+.bm .bm-outline{stroke:none}
 .bm-sil{fill:var(--bm-sil)}
 .bm-l0{fill:var(--bm-l0)}
 .bm-l1{fill:var(--bm-l1)}.bm-l2{fill:var(--bm-l2)}.bm-l3{fill:var(--bm-l3)}.bm-l4{fill:var(--bm-l4)}
@@ -1236,6 +1237,10 @@ function regionLoads(exercises){
 const LOAD_LEVELS=[{max:2.5,label:'1–2'},{max:4.5,label:'3–4'},{max:7.5,label:'5–7'},{max:Infinity,label:'8+'}];
 function loadLevel(v){return v>0?LOAD_LEVELS.findIndex(l=>v<l.max)+1:0;}
 
+// Silueta continua de media figura (cuello → brazo → mano → axila → cadera → pierna → pie),
+// común a las dos vistas; los músculos se dibujan encima.
+const BODY_OUTLINE='M60 31 L54 31 L54 38 Q46 42 37 44 Q26 45 22 54 Q19 62 19 74 Q16 86 16 98 Q13 110 12 122 Q10 132 11 138 Q8 146 11 152 Q15 155 18 150 Q20 144 19 138 Q24 124 27 110 Q30 100 30 94 Q33 86 34 76 Q36 92 37 106 Q37 118 39 128 Q32 144 32 166 Q33 188 37 204 Q34 222 36 240 Q37 248 36 252 Q32 257 37 258 L55 258 Q57 254 54 249 Q56 230 54 213 Q56 207 55 201 Q59 180 59.5 150 L60 142 Z';
+
 // Formas de media figura (lado izquierdo de la imagen); se reflejan para el otro lado.
 // [zona | null (silueta), etiqueta SVG, atributos]. viewBox 0 0 120 260, eje de simetría x=60.
 const BODY_SHAPES={
@@ -1251,7 +1256,6 @@ const BODY_SHAPES={
       ['deltF','path',{d:'M43 48 Q36 45 32 48 Q27 58 28 72 L33 72 Q35 61 43 53 Z'}],
       ['biceps','path',{d:'M23 75 Q19 85 19 96 Q21 102 26 101 Q31 92 32 76 Z'}],
       ['forearms','path',{d:'M19 104 Q14 116 13 131 Q15 136 19 136 Q24 121 28 104 Z'}],
-      [null,'ellipse',{cx:15,cy:144,rx:5,ry:7.5}],
       ['abs','rect',{x:50.5,y:84,width:8,height:10,rx:2}],
       ['abs','rect',{x:50.5,y:96,width:8,height:10,rx:2}],
       ['abs','rect',{x:50.5,y:108,width:8,height:10,rx:2}],
@@ -1263,7 +1267,6 @@ const BODY_SHAPES={
       [null,'ellipse',{cx:46,cy:207,rx:7,ry:4.5}],
       ['calves','path',{d:'M39 213 Q34 227 37 244 L43 246 Q44 228 44.5 213 Z'}],
       ['calves','path',{d:'M46.5 213 Q48 228 47 246 L53 246 Q56 228 52 213 Z'}],
-      [null,'path',{d:'M37 249 L54 249 L56 256 Q46 258 35 256 Z'}],
     ],
   },
   back:{
@@ -1280,15 +1283,12 @@ const BODY_SHAPES={
       ['deltB','path',{d:'M42 48 Q36 45 32 48 Q27 58 28 72 L33 72 Q35 61 41 52 Z'}],
       ['triceps','path',{d:'M23 75 Q19 85 19 96 Q21 102 26 101 Q31 92 32 76 Z'}],
       ['forearms','path',{d:'M19 104 Q14 116 13 131 Q15 136 19 136 Q24 121 28 104 Z'}],
-      [null,'ellipse',{cx:15,cy:144,rx:5,ry:7.5}],
       ['glutes','path',{d:'M59.5 129 Q48 126 40 132 Q35 143 38 155 Q46 163 59.5 159 Z'}],
       ['hamstrings','path',{d:'M38 159 Q33 177 36 200 L45 202 Q45 181 50 162 Q44 162 38 159 Z'}],
       ['hamstrings','path',{d:'M52 163 Q47 181 47.5 202 L56 202 Q58.5 183 58.5 162 Z'}],
       [null,'ellipse',{cx:46,cy:207,rx:7,ry:4.5}],
       ['calves','path',{d:'M38.5 212 Q33 224 36 237 Q40 241 45 237 Q46 223 45 212 Z'}],
       ['calves','path',{d:'M47 212 Q46 225 48 239 Q53 241 55 235 Q57 223 53 212 Z'}],
-      [null,'path',{d:'M39 240 Q45 243 54 240 L53 249 L40 249 Z'}],
-      [null,'path',{d:'M37 250 L54 250 L56 256 Q46 258 35 256 Z'}],
     ],
   },
 };
@@ -1298,6 +1298,8 @@ function BodyFigure({side,loads,label}){
   const shape=([region,tag,attrs],i)=>h(tag,{key:i,...attrs,className:region?'bm-l'+loadLevel(loads[region]):'bm-sil'});
   return h('div',{className:'sc-map-side'},
     h('svg',{viewBox:'0 0 120 260',width:132,height:286,className:'bm',role:'img','aria-label':'Músculos trabajados, vista '+label.toLowerCase()},
+      h('path',{className:'bm-sil bm-outline',d:BODY_OUTLINE}),
+      h('path',{className:'bm-sil bm-outline',d:BODY_OUTLINE,transform:'translate(120,0) scale(-1,1)'}),
       shapes.center.map(shape),
       h('g',null,shapes.half.map(shape)),
       h('g',{transform:'translate(120,0) scale(-1,1)'},shapes.half.map(shape))
