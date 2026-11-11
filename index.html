@@ -184,6 +184,61 @@ body{
 .series-row{display:grid;gap:6px;align-items:center;margin-bottom:8px}
 .series-header.strength,.series-row.strength{grid-template-columns:28px 1fr 1fr 28px}
 .series-header.cardio,.series-row.cardio{grid-template-columns:28px 1fr 1fr 28px}
+.series-header.time,.series-row.time{grid-template-columns:28px 1fr 28px}
+.prev-row{display:grid;gap:6px;margin-bottom:4px;padding:3px 0;border-bottom:0.5px dashed var(--border)}
+.prev-row.strength{grid-template-columns:28px 1fr 1fr 28px}
+.prev-row.time{grid-template-columns:28px 1fr 28px}
+.series-header.strength.chk,.series-row.strength.chk,.prev-row.strength.chk{grid-template-columns:28px 1fr 1fr 36px 24px}
+.series-header.time.chk,.series-row.time.chk,.prev-row.time.chk{grid-template-columns:28px 1fr 36px 24px}
+.done-btn{
+  width:36px;height:36px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg2);
+  color:var(--t2);font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;
+}
+.done-btn.on{background:#3B6D11;border-color:#3B6D11;color:#fff}
+.series-row.done .series-input{opacity:.65}
+/* Temporizador de descanso */
+.rest-bar{
+  position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom));z-index:60;
+  padding:10px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+  background:var(--card);border-top:0.5px solid var(--border2);box-shadow:0 -6px 20px rgba(0,0,0,.12);
+}
+.rest-inner{display:flex;align-items:center;gap:10px;max-width:640px;margin:0 auto}
+.rest-time{font-size:26px;font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums;min-width:68px}
+.rest-label{font-size:11px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.rest-track{height:4px;border-radius:2px;background:var(--bg2);margin-top:5px;overflow:hidden}
+.rest-fill{height:100%;background:var(--accent2);transition:width .25s linear}
+.rest-btns{display:flex;gap:6px;margin-left:auto;flex-shrink:0}
+.rest-bar.finished{background:#EAF3DE;border-top-color:#3B6D11;animation:restflash .5s ease-in-out 3}
+.rest-bar.finished .rest-time,.rest-bar.finished .rest-label{color:#3B6D11}
+@media(prefers-color-scheme:dark){.rest-bar.finished{background:#152a0a}.rest-bar.finished .rest-time,.rest-bar.finished .rest-label{color:#97C459}}
+@keyframes restflash{50%{opacity:.55}}
+@media(prefers-reduced-motion:reduce){.rest-bar.finished{animation:none}.rest-fill{transition:none}}
+.rest-setting{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2);text-transform:none;letter-spacing:0;font-weight:500}
+.rest-setting select{height:30px;border:0.5px solid var(--border2);border-radius:8px;background:var(--bg2);color:var(--t1);font-family:inherit;font-size:16px;padding:0 6px}
+.variant-row{display:flex;align-items:center;gap:8px;margin:-4px 0 10px}
+.variant-label{font-size:11px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+.variant-select{
+  flex:1;min-width:0;height:34px;border:0.5px solid var(--border2);border-radius:8px;
+  padding:0 8px;font-size:16px;background:var(--bg2);color:var(--t1);font-family:inherit;
+}
+.variant-select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.variant-prev{font-size:11px;color:var(--t2);margin:-6px 0 10px}
+.fg textarea{
+  border:0.5px solid var(--border2);border-radius:10px;padding:10px 12px;font-size:16px;
+  background:var(--bg2);color:var(--t1);font-family:inherit;width:100%;resize:vertical;line-height:1.4;
+}
+.fg textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.fg select:disabled{opacity:.6}
+/* Rutinas */
+.routine-chips{display:flex;gap:6px;flex-wrap:wrap}
+.routine-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:0.5px solid var(--border)}
+.routine-item:last-child{border-bottom:none}
+.routine-item-name{flex:1;min-width:0;font-size:14px;color:var(--t1)}
+.icon-btn{
+  width:30px;height:30px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;
+  color:var(--t2);cursor:pointer;font-family:inherit;font-size:14px;flex-shrink:0;
+}
+.icon-btn:disabled{opacity:.3;cursor:default}
 .series-input{
   height:36px;border:0.5px solid var(--border2);border-radius:8px;
   padding:0 8px;font-size:16px;background:var(--bg2);color:var(--t1);
@@ -463,6 +518,8 @@ body{
   .navbtn svg{width:18px;height:18px}
   .content{padding-bottom:16px}
   .overlay{align-items:center}
+  /* En pantalla ancha el menú va arriba: la barra de descanso se pega al borde inferior */
+  .rest-bar{bottom:0;padding-bottom:max(10px, env(safe-area-inset-bottom))}
   .modal{border-radius:20px;width:min(480px,92vw);max-height:85vh}
   .modal-handle{display:none}
 }
@@ -502,9 +559,47 @@ const DEFAULT_LIBRARY=[
   {id:'press-frances',name:'Press francés',muscle:'Tríceps',isCardio:false},
   {id:'extension-triceps',name:'Extensión de tríceps en polea',muscle:'Tríceps',isCardio:false},
   {id:'crunch',name:'Crunch abdominal',muscle:'Core',isCardio:false},
-  {id:'plancha',name:'Plancha',muscle:'Core',isCardio:false},
+  {id:'plancha',name:'Plancha',muscle:'Core',isCardio:false,mode:'time',
+   variants:['Con rodillas apoyadas','Normal','Apretando al máximo','Levantando un brazo o una pierna']},
   {id:'hip-thrust',name:'Hip thrust',muscle:'Glúteos',isCardio:false},
   {id:'patada-gluteo',name:'Patada de glúteo',muscle:'Glúteos',isCardio:false},
+  // Calistenia (peso corporal y por tiempo); las variantes van de más fácil a más difícil
+  {id:'flexiones',name:'Flexión',muscle:'Pecho',isCardio:false,mode:'bodyweight',
+   variants:['Inclinadas (manos en una mesa)','Normales','Bajada lenta de 4 s','Pies elevados en una silla','Arqueras']},
+  {id:'flexiones-pica',name:'Flexión en pica',muscle:'Hombros',isCardio:false,mode:'bodyweight',
+   variants:['Pies en el suelo','Pies en una silla','Pies en silla, cadera a 90°','Pino contra la pared, solo bajando']},
+  {id:'flexiones-cerradas',name:'Flexión cerrada',muscle:'Tríceps',isCardio:false,mode:'bodyweight',
+   variants:['Inclinadas en una mesa','Normales cerradas','Diamante','Cerradas con pies elevados']},
+  {id:'fondos-silla',name:'Fondo en silla',muscle:'Tríceps',isCardio:false,mode:'bodyweight',
+   variants:['Rodillas dobladas','Piernas estiradas','Pies en otra silla','Con pausa de 2 s abajo']},
+  {id:'remo-mesa',name:'Remo invertido bajo mesa',muscle:'Espalda',isCardio:false,mode:'bodyweight',
+   variants:['Rodillas dobladas','Piernas estiradas','Pausa de 2 s arriba','Pies elevados']},
+  {id:'remo-toalla',name:'Remo con toalla en puerta',muscle:'Espalda',isCardio:false,mode:'bodyweight',
+   variants:['Cuerpo bastante vertical','Más inclinado','Pausa de 2 s arriba','Con un brazo']},
+  {id:'ytw',name:'Y-T-W tumbado',muscle:'Hombros',isCardio:false,mode:'bodyweight',
+   variants:['Y-T-W','Con pausa de 3 s','Con botellas de agua','Añadiendo una I']},
+  {id:'sentadilla-libre',name:'Sentadilla sin peso',muscle:'Piernas',isCardio:false,mode:'bodyweight',
+   variants:['A una silla','Bajada de 3 s','Pausa de 3 s abajo','Sentadilla y media']},
+  {id:'zancada-atras',name:'Zancada hacia atrás',muscle:'Piernas',isCardio:false,mode:'bodyweight',
+   variants:['Apoyando una mano en la pared','Normal','Pausa de 2 s abajo','Pie delantero en un escalón']},
+  {id:'bulgara',name:'Sentadilla búlgara',muscle:'Piernas',isCardio:false,mode:'bodyweight',
+   variants:['Zancada estática','Búlgara','Bajada de 3 s y pausa','Con mochila cargada']},
+  {id:'curl-toalla',name:'Curl femoral deslizante',muscle:'Piernas',isCardio:false,mode:'bodyweight',
+   variants:['Solo la ida, despacio','Completo a dos piernas','Completo con bajada lenta','A una pierna']},
+  {id:'gemelos',name:'Elevación de gemelos',muscle:'Piernas',isCardio:false,mode:'bodyweight',
+   variants:['Dos piernas en el suelo','Dos piernas en escalón','Una pierna en escalón','Una pierna con pausa de 2 s']},
+  {id:'puente-gluteo',name:'Puente de glúteo',muscle:'Glúteos',isCardio:false,mode:'bodyweight',
+   variants:['Dos piernas','Una pierna','Una pierna con pausa de 3 s','Una pierna con la espalda en el sofá']},
+  {id:'hip-thrust-sofa',name:'Hip thrust en sofá',muscle:'Glúteos',isCardio:false,mode:'bodyweight',
+   variants:['Dos piernas','Pausa de 3 s arriba','Una pierna','Una pierna con pausa']},
+  {id:'dead-bug',name:'Dead bug',muscle:'Core',isCardio:false,mode:'bodyweight',
+   variants:['Solo piernas','Brazo y pierna contrarios','Pausa de 3 s estirado','Piernas casi rectas']},
+  {id:'hollow',name:'Hollow hold',muscle:'Core',isCardio:false,mode:'time',
+   variants:['Rodillas dobladas, brazos a los lados','Piernas estiradas, brazos a los lados','Brazos por encima de la cabeza','Balanceo (hollow rocks)']},
+  {id:'plancha-lateral',name:'Plancha lateral',muscle:'Core',isCardio:false,mode:'time',
+   variants:['Con rodillas apoyadas','Normal','Pierna de arriba levantada','Con subidas de cadera']},
+  {id:'wall-sit',name:'Sentadilla isométrica en pared',muscle:'Piernas',isCardio:false,mode:'time',
+   variants:['Más alto (ángulo abierto)','Muslos paralelos','Más peso en una pierna','A una pierna']},
   {id:'carrera',name:'Carrera',muscle:'Cardio',isCardio:true},
   {id:'bicicleta',name:'Bicicleta estática',muscle:'Cardio',isCardio:true},
   {id:'eliptica',name:'Elíptica',muscle:'Cardio',isCardio:true},
@@ -546,11 +641,38 @@ function migrateSessions(sessions){
   return sessions.map(s=>({...s,exercises:s.exercises.map(migrateExercise)}));
 }
 // Renombra a los nombres actuales y añade los ejercicios por defecto que falten: la biblioteca se guarda
-// entera en el dispositivo y los por defecto no se pueden borrar, así que uno ausente es uno nuevo
+// entera en el dispositivo y los por defecto no se pueden borrar, así que uno ausente es uno nuevo.
+// A los por defecto guardados antes de existir modo y variantes se les añaden (sin pisar lo editado).
 function migrateLibrary(library){
-  const migrated=library.map(e=>DEFAULT_BY_ID[e.id]&&LEGACY_NAMES[e.id]?.includes(e.name)?{...e,name:DEFAULT_BY_ID[e.id].name}:e);
+  const migrated=library.map(e=>{
+    const def=DEFAULT_BY_ID[e.id];
+    if(!def)return e;
+    let r=LEGACY_NAMES[e.id]?.includes(e.name)?{...e,name:def.name}:e;
+    if(def.mode&&!r.mode)r={...r,mode:def.mode};
+    if(def.variants&&!r.variants)r={...r,variants:def.variants};
+    return r;
+  });
   const ids=new Set(migrated.map(e=>e.id));
   return [...migrated,...DEFAULT_LIBRARY.filter(e=>!ids.has(e.id))];
+}
+
+// Modo de registro: peso (kg × reps), peso corporal (reps + lastre opcional), tiempo (segundos) o cardio
+const MODES=['weight','bodyweight','time'];
+const MODE_LABELS={weight:'Peso',bodyweight:'Peso corporal',time:'Tiempo',cardio:'Cardio'};
+function exMode(e){return e.isCardio?'cardio':(e.mode||'weight');}
+
+// Rutinas: plantillas de ejercicios (por libraryId) que se cargan de golpe en la sesión
+const DEFAULT_ROUTINES=[
+  {id:'r-torso-a',name:'Torso A',items:['flexiones','flexiones-pica','fondos-silla','remo-mesa','plancha']},
+  {id:'r-pierna-a',name:'Pierna A',items:['sentadilla-libre','zancada-atras','puente-gluteo','gemelos','dead-bug']},
+  {id:'r-torso-b',name:'Torso B',items:['remo-toalla','flexiones-cerradas','flexiones-pica','ytw','hollow']},
+  {id:'r-pierna-b',name:'Pierna B',items:['bulgara','curl-toalla','hip-thrust-sofa','wall-sit','plancha-lateral']},
+];
+// Descarta rutinas mal formadas (p. ej. de una copia editada a mano)
+function sanitizeRoutines(list){
+  if(!Array.isArray(list))return DEFAULT_ROUTINES;
+  return list.filter(r=>r&&r.id!=null&&typeof r.name==='string'&&Array.isArray(r.items))
+    .map(r=>({...r,items:r.items.filter(x=>x!=null)}));
 }
 
 // ---- Local Storage ----
@@ -570,7 +692,10 @@ function saveState(key,val){
 function estimateStrengthCals(exercise,bw){
   if(!bw||bw<=0)return 0;
   const met=MUSCLE_MET[exercise.muscle]||4.0;
+  const timed=exMode(exercise)==='time';
   return Math.round(exercise.sets.reduce((t,s)=>{
+    // Isométricos: el tiempo aguantado más el descanso de la serie
+    if(timed){const secs=parseFloat(s.secs)||0;return secs?t+met*0.9*bw*(secs+90)/3600:t;}
     const reps=parseInt(s.reps)||0;if(!reps)return t;
     const hrs=(reps*3+90)/3600;
     const im=reps<=5?1.25:reps<=10?1.05:reps<=15?0.9:0.75;
@@ -600,16 +725,36 @@ function calcSessionCals(exercises,bw){
 
 // ---- Session helpers ----
 function setHasData(e,s){
-  return e.isCardio?(parseFloat(s.duration)>0||parseFloat(s.distance)>0):(parseFloat(s.weight)>0||parseInt(s.reps)>0);
+  const mode=exMode(e);
+  if(mode==='cardio')return parseFloat(s.duration)>0||parseFloat(s.distance)>0;
+  if(mode==='time')return parseFloat(s.secs)>0;
+  // En peso corporal el lastre solo no es una serie: hacen falta repeticiones
+  if(mode==='bodyweight')return parseInt(s.reps)>0;
+  return parseFloat(s.weight)>0||parseInt(s.reps)>0;
 }
-function newSessionExercise(libEx){
-  return {id:Date.now(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
-    sets:libEx.isCardio?[{id:Date.now(),duration:'',distance:''}]:[{id:Date.now(),reps:'',weight:''}]};
+function emptySet(mode,id=Date.now()){
+  if(mode==='cardio')return {id,duration:'',distance:''};
+  if(mode==='time')return {id,secs:''};
+  return {id,reps:'',weight:''};
 }
-function exerciseHasData(e){return e.sets.some(s=>s.weight||s.reps||s.duration||s.distance);}
+// variant: la última usada en ese ejercicio, si sigue existiendo; si no, la primera
+function newSessionExercise(libEx,lastVariant){
+  const variants=libEx.isCardio?[]:(libEx.variants||[]);
+  const variant=variants.includes(lastVariant)?lastVariant:variants[0];
+  return {id:Date.now()+Math.random(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
+    ...(!libEx.isCardio&&libEx.mode&&libEx.mode!=='weight'?{mode:libEx.mode}:{}),
+    ...(variant?{variant}:{}),
+    sets:[emptySet(exMode(libEx))]};
+}
+function exerciseHasData(e){return e.sets.some(s=>s.weight||s.reps||s.duration||s.distance||s.secs);}
+// Repeticiones totales en ejercicios de peso corporal (no suman al volumen en kg salvo el lastre)
+function bodyweightReps(exercises){
+  return exercises.filter(e=>exMode(e)==='bodyweight').reduce((t,e)=>t+e.sets.reduce((a,s)=>a+(parseInt(s.reps)||0),0),0);
+}
 // Quita series vacías y ejercicios que se quedan sin series
 function cleanExercises(exercises){
-  return exercises.map(e=>({...e,sets:e.sets.filter(s=>setHasData(e,s))})).filter(e=>e.sets.length>0);
+  // La marca de serie hecha (done) solo sirve durante la sesión: no se guarda
+  return exercises.map(e=>({...e,sets:e.sets.filter(s=>setHasData(e,s)).map(({done,...s})=>s)})).filter(e=>e.sets.length>0);
 }
 function sumSets(exercises,cardio,fn){
   return exercises.filter(e=>!!e.isCardio===cardio).reduce((t,e)=>t+e.sets.reduce((a,s)=>a+fn(s),0),0);
@@ -707,7 +852,8 @@ function LineChart({labels,data,color,unit}){
       data:{labels,datasets:[{data,borderColor:color||'#378ADD',backgroundColor:(color||'#378ADD')+'25',fill:true,tension:.35,pointBackgroundColor:color||'#378ADD',pointRadius:4}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
         scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}},
-                y:{grid:{color:gc},ticks:{color:tc,font:{size:10},...(unit?{callback:v=>v+' '+unit}:{})}}}}
+                // Reps y segundos son enteros: sin marcas como "14.5 reps"
+                y:{grid:{color:gc},ticks:{color:tc,font:{size:10},...(unit?{callback:v=>v+' '+unit}:{}),...(unit==='reps'||unit==='s'?{precision:0}:{})}}}}
     });
     return()=>{if(cr.current)cr.current.destroy()};
   },[labels,data,color,unit,dk]);
@@ -754,18 +900,54 @@ function ExercisePicker({library,onSelect,onCreateNew}){
   );
 }
 
+// ---- Modo y variantes (formularios de crear y editar ejercicio) ----
+// Una variante por línea, sin vacías ni repetidas
+function parseVariants(text){return [...new Set(String(text).split('\n').map(s=>s.trim()).filter(Boolean))];}
+const MODE_HELP={
+  weight:'Series de peso (kg) × repeticiones.',
+  bodyweight:'Repeticiones con tu peso. El lastre (kg) es opcional y es lo único que suma al volumen.',
+  time:'Segundos aguantados, para isométricos como la plancha.',
+};
+function ModeAndVariantsFields({mode,onMode,variantsText,onVariants,modeLocked}){
+  return h('div',null,
+    h('div',{className:'fg'},
+      h('label',null,'Registro'),
+      h('select',{value:mode,disabled:modeLocked,onChange:e=>onMode(e.target.value)},
+        MODES.map(m=>h('option',{key:m,value:m},MODE_LABELS[m]))),
+      h('div',{style:{fontSize:11,color:'var(--t2)',marginTop:2}},
+        modeLocked?'Tiene sesiones registradas: no se puede cambiar el tipo de registro.':MODE_HELP[mode])
+    ),
+    h('div',{className:'fg'},
+      h('label',null,'Variantes (opcional, una por línea, de fácil a difícil)'),
+      h('textarea',{className:'variants-input',rows:4,value:variantsText,onChange:e=>onVariants(e.target.value),
+        placeholder:'Inclinadas\nNormales\nPies elevados'})
+    )
+  );
+}
+
 // ---- New Exercise Modal ----
 function NewExerciseModal({initialName,onSave,onClose}){
   const [name,setName]=useState(initialName||'');
   const [muscle,setMuscle]=useState('Pecho');
-  function save(){if(!name.trim()){alert('Escribe el nombre');return;}onSave({id:'c-'+Date.now(),name:name.trim(),muscle,isCardio:muscle==='Cardio'});onClose();}
+  const [mode,setMode]=useState('weight');
+  const [variantsText,setVariantsText]=useState('');
+  function save(){
+    if(!name.trim()){alert('Escribe el nombre');return;}
+    const isCardio=muscle==='Cardio';
+    const variants=parseVariants(variantsText);
+    onSave({id:'c-'+Date.now(),name:name.trim(),muscle,isCardio,
+      ...(!isCardio&&mode!=='weight'?{mode}:{}),
+      ...(!isCardio&&variants.length?{variants}:{})});
+    onClose();
+  }
   return h('div',{className:'overlay',onTouchEnd:e=>{if(e.target===e.currentTarget)onClose();},onClick:e=>{if(e.target===e.currentTarget)onClose();}},
     h('div',{className:'modal'},
       h('div',{className:'modal-handle'}),
       h('div',{className:'modaltitle'},'Nuevo ejercicio'),
-      h('div',{className:'fg'},h('label',null,'Nombre'),h('input',{value:name,onChange:e=>setName(e.target.value),placeholder:'Ej: Sentadilla búlgara'})),
+      h('div',{className:'fg'},h('label',null,'Nombre'),h('input',{value:name,onChange:e=>setName(e.target.value),placeholder:'Ej: Remo con mancuerna'})),
       h('div',{className:'fg'},h('label',null,'Grupo muscular'),h('select',{value:muscle,onChange:e=>setMuscle(e.target.value)},MUSCLES.map(m=>h('option',{key:m},m)))),
       muscle==='Cardio'&&h('p',{style:{fontSize:12,color:'var(--t2)',marginBottom:10}},'Se registrará con duración en minutos.'),
+      muscle!=='Cardio'&&h(ModeAndVariantsFields,{mode,onMode:setMode,variantsText,onVariants:setVariantsText}),
       h('div',{style:{display:'flex',gap:8,marginTop:8}},
         h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar'),
         h('button',{className:'btn btns',onClick:onClose},'Cancelar')
@@ -775,17 +957,110 @@ function NewExerciseModal({initialName,onSave,onClose}){
 }
 
 // ---- Exercise Block ----
-function ExerciseBlock({ex,onChange,onRemove,bw,prevSets=[]}){
-  const isCardio=ex.isCardio;
+const COL_LABEL={fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'};
+const PREV_LABEL={textAlign:'center',fontSize:10,color:'var(--t2)',fontStyle:'italic',opacity:.7};
+// variants: las de la biblioteca; prevEx: el mismo ejercicio en la última sesión que se hizo
+// onSetDone: si se pasa (solo en la sesión en curso), cada serie lleva un botón ✓ que inicia el descanso
+function ExerciseBlock({ex,onChange,onRemove,bw,variants=[],prevEx=null,onSetDone}){
+  const mode=exMode(ex);
+  const isCardio=mode==='cardio';
+  const prevSets=prevEx?.sets||[];
   const estCal=bw>0?(isCardio?estimateCardioCals(ex,bw):estimateStrengthCals(ex,bw)):null;
   function updSet(i,f,v){const ns=[...ex.sets];ns[i]={...ns[i],[f]:v};onChange({...ex,sets:ns});}
   function addSet(){
     const l=ex.sets[ex.sets.length-1]||{};
-    onChange({...ex,sets:[...ex.sets,isCardio?{id:Date.now(),duration:'',distance:''}:{id:Date.now(),reps:l.reps||'',weight:l.weight||''}]});
+    const s=emptySet(mode);
+    if(mode==='weight'||mode==='bodyweight'){s.reps=l.reps||'';s.weight=l.weight||'';}
+    if(mode==='time')s.secs=l.secs||'';
+    onChange({...ex,sets:[...ex.sets,s]});
   }
   function remSet(i){if(ex.sets.length===1)return;onChange({...ex,sets:ex.sets.filter((_,j)=>j!==i)});}
-
+  // Si la variante guardada ya no está en la biblioteca (renombrada o borrada), se conserva como opción
+  const variantOptions=ex.variant&&!variants.includes(ex.variant)?[...variants,ex.variant]:variants;
   const hasPrev=!isCardio&&prevSets.length>0;
+  const rmv=i=>ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null);
+  const num=i=>h('div',{className:'series-num'},'#'+(i+1));
+  const withCheck=!!onSetDone&&!isCardio;
+  const ck=withCheck?' chk':'';
+  const blank=()=>withCheck&&h('div',null);
+  function toggleDone(i){
+    const done=!ex.sets[i].done;
+    updSet(i,'done',done);
+    if(done)onSetDone();
+  }
+  const doneBtn=i=>withCheck&&h('button',{className:'done-btn'+(ex.sets[i].done?' on':''),onClick:()=>toggleDone(i),
+    'aria-label':ex.sets[i].done?'Desmarcar serie':'Serie hecha: empezar descanso','aria-pressed':!!ex.sets[i].done},'✓');
+  const input=(i,field,placeholder,decimal)=>h('input',{className:'series-input',type:'number',
+    inputMode:decimal?'decimal':'numeric',min:0,step:decimal?.5:1,placeholder,
+    value:ex.sets[i][field]??'',onChange:e=>updSet(i,field,e.target.value)});
+
+  let body;
+  if(isCardio){
+    body=h('div',null,
+      h('div',{className:'series-header cardio'},
+        h('div',{className:'series-num'},'#'),
+        h('div',{style:COL_LABEL},'Duración (min)'),
+        h('div',{style:COL_LABEL},'Distancia (km)'),
+        h('div',null)
+      ),
+      ex.sets.map((s,i)=>h('div',{key:s.id,className:'series-row cardio'},
+        num(i),
+        h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.1,
+          placeholder:prevSets[i]?.duration||'30',
+          value:s.duration,onChange:e=>updSet(i,'duration',e.target.value)}),
+        h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.1,
+          placeholder:prevSets[i]?.distance||'km',
+          value:s.distance||'',onChange:e=>updSet(i,'distance',e.target.value)}),
+        rmv(i)
+      )),
+      h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir intervalo')
+    );
+  }else if(mode==='time'){
+    body=h('div',null,
+      h('div',{className:'series-header time'+ck},
+        h('div',{className:'series-num'},'#'),
+        h('div',{style:COL_LABEL},'Segundos'),
+        blank(),
+        h('div',null)
+      ),
+      hasPrev&&h('div',{className:'prev-row time'+ck},h('div',null),h('div',{style:PREV_LABEL},'anterior'),blank(),h('div',null)),
+      ex.sets.map((s,i)=>h('div',{key:s.id,className:'series-row time'+ck+(s.done?' done':'')},
+        num(i),
+        // El valor de la sesión anterior se muestra como placeholder
+        input(i,'secs',prevSets[i]?.secs?String(prevSets[i].secs):'seg',false),
+        doneBtn(i),
+        rmv(i)
+      )),
+      h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir serie')
+    );
+  }else{
+    // Peso: kg | reps. Peso corporal: reps | lastre (lo principal primero)
+    const bwMode=mode==='bodyweight';
+    const cols=bwMode?[['reps','Reps',false],['weight','Lastre (kg)',true]]:[['weight','Peso (kg)',true],['reps','Reps',false]];
+    const prevPh=(i,field)=>{
+      const v=prevSets[i]?.[field];
+      if(v)return String(v);
+      return field==='reps'?'reps':bwMode?'0':'kg';
+    };
+    body=h('div',null,
+      h('div',{className:'series-header strength'+ck},
+        h('div',{className:'series-num'},'#'),
+        cols.map(([f,label])=>h('div',{key:f,style:COL_LABEL},label)),
+        blank(),
+        h('div',null)
+      ),
+      hasPrev&&h('div',{className:'prev-row strength'+ck},
+        h('div',null),h('div',{style:PREV_LABEL},'anterior'),h('div',{style:PREV_LABEL},'anterior'),blank(),h('div',null)
+      ),
+      ex.sets.map((s,i)=>h('div',{key:s.id,className:'series-row strength'+ck+(s.done?' done':'')},
+        num(i),
+        cols.map(([f,,decimal])=>h(React.Fragment,{key:f},input(i,f,prevPh(i,f),decimal))),
+        doneBtn(i),
+        rmv(i)
+      )),
+      h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir serie')
+    );
+  }
 
   return h('div',{className:'exblock'},
     h('div',{className:'exblock-header'},
@@ -795,65 +1070,15 @@ function ExerciseBlock({ex,onChange,onRemove,bw,prevSets=[]}){
       ),
       h('button',{className:'btnd',onClick:onRemove},'Eliminar')
     ),
-    isCardio
-      ? h('div',null,
-          h('div',{className:'series-header cardio'},
-            h('div',{className:'series-num'},'#'),
-            h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'}},'Duración (min)'),
-            h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'}},'Distancia (km)'),
-            h('div',null)
-          ),
-          ex.sets.map((s,i)=>h('div',{key:s.id,className:'series-row cardio'},
-            h('div',{className:'series-num'},'#'+(i+1)),
-            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.1,
-              placeholder:prevSets[i]?.duration||'30',
-              value:s.duration,onChange:e=>updSet(i,'duration',e.target.value)}),
-            h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.1,
-              placeholder:prevSets[i]?.distance||'km',
-              value:s.distance||'',onChange:e=>updSet(i,'distance',e.target.value)}),
-            ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null)
-          )),
-          h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir intervalo')
-        )
-      : h('div',null,
-          h('div',{className:'series-header strength'},
-            h('div',{className:'series-num'},'#'),
-            h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'}},'Peso (kg)'),
-            h('div',{style:{fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWeight:600,textAlign:'center'}},'Reps'),
-            h('div',null)
-          ),
-          hasPrev&&h('div',{style:{
-            display:'grid',gridTemplateColumns:'28px 1fr 1fr 28px',gap:6,
-            marginBottom:4,padding:'3px 0',
-            borderBottom:'0.5px dashed var(--border)',
-          }},
-            h('div',null),
-            h('div',{style:{textAlign:'center',fontSize:10,color:'var(--t2)',fontStyle:'italic',opacity:.7}},
-              'anterior'
-            ),
-            h('div',{style:{textAlign:'center',fontSize:10,color:'var(--t2)',fontStyle:'italic',opacity:.7}},
-              'anterior'
-            ),
-            h('div',null)
-          ),
-          ex.sets.map((s,i)=>{
-            const prev=prevSets[i]||{};
-            const pwPlaceholder=prev.weight?String(prev.weight):'kg';
-            const prPlaceholder=prev.reps?String(prev.reps):'reps';
-            return h('div',{key:s.id,className:'series-row strength',style:{position:'relative'}},
-              h('div',{className:'series-num'},'#'+(i+1)),
-              // El valor de la sesión anterior se muestra como placeholder
-              h('input',{className:'series-input',type:'number',inputMode:'decimal',min:0,step:.5,
-                placeholder:pwPlaceholder,value:s.weight,
-                onChange:e=>updSet(i,'weight',e.target.value)}),
-              h('input',{className:'series-input',type:'number',inputMode:'numeric',min:1,
-                placeholder:prPlaceholder,value:s.reps,
-                onChange:e=>updSet(i,'reps',e.target.value)}),
-              ex.sets.length>1?h('button',{className:'rmv-btn',onClick:()=>remSet(i)},'×'):h('span',null)
-            );
-          }),
-          h('button',{className:'add-set-btn',onClick:addSet},'+ Añadir serie')
-        )
+    variantOptions.length>0&&h('div',{className:'variant-row'},
+      h('span',{className:'variant-label'},'Variante'),
+      h('select',{className:'variant-select',value:ex.variant||'',onChange:e=>onChange({...ex,variant:e.target.value||undefined})},
+        !ex.variant&&h('option',{value:''},'—'),
+        variantOptions.map((v,i)=>h('option',{key:v,value:v},(variants.includes(v)?(variants.indexOf(v)+1)+'. ':'')+v))
+      )
+    ),
+    prevEx?.variant&&prevEx.variant!==ex.variant&&h('div',{className:'variant-prev'},'La última vez: '+prevEx.variant),
+    body
   );
 }
 
@@ -1200,6 +1425,25 @@ const EXERCISE_REGIONS={
   'eliptica':         {p:['quads','glutes'],s:['hamstrings','calves']},
   'remo-cardio':      {p:['lats','quads'],s:['upperback','biceps','hamstrings','glutes']},
   'cuerda':           {p:['calves'],s:['quads','deltS']},
+  // Calistenia
+  'flexiones':        {p:['chest','triceps'],s:['deltF','abs']},
+  'flexiones-pica':   {p:['deltF','deltS'],s:['triceps','traps']},
+  'flexiones-cerradas':{p:['triceps','chest'],s:['deltF']},
+  'fondos-silla':     {p:['triceps'],s:['chest','deltF']},
+  'remo-mesa':        {p:['lats','upperback'],s:['biceps','deltB']},
+  'remo-toalla':      {p:['lats','upperback'],s:['biceps','deltB','forearms']},
+  'ytw':              {p:['upperback','deltB'],s:['traps']},
+  'sentadilla-libre': {p:['quads','glutes'],s:['hamstrings']},
+  'zancada-atras':    {p:['quads','glutes'],s:['hamstrings','calves']},
+  'bulgara':          {p:['quads','glutes'],s:['hamstrings']},
+  'curl-toalla':      {p:['hamstrings'],s:['glutes','calves']},
+  'gemelos':          {p:['calves'],s:[]},
+  'puente-gluteo':    {p:['glutes'],s:['hamstrings']},
+  'hip-thrust-sofa':  {p:['glutes'],s:['hamstrings']},
+  'dead-bug':         {p:['abs'],s:['obliques']},
+  'hollow':           {p:['abs'],s:['obliques']},
+  'plancha-lateral':  {p:['obliques'],s:['abs','glutes']},
+  'wall-sit':         {p:['quads'],s:['glutes']},
 };
 // Ejercicios personalizados: según su grupo muscular
 const GROUP_REGIONS={
@@ -1435,6 +1679,85 @@ function fmtDuration(secs){
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
+// ---- Rest timer ----
+const REST_KEY='il_restSecs';
+const REST_OPTIONS=[45,60,75,90,120,150,180];
+// iOS solo deja sonar audio web si el AudioContext se crea o reanuda dentro de un toque del usuario:
+// unlockAudio() se llama al pulsar ✓ y el pitido final reutiliza ese contexto
+let audioCtx=null;
+function unlockAudio(){
+  try{
+    if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioCtx=new AC();}
+    if(audioCtx.state==='suspended')audioCtx.resume();
+  }catch(e){}
+}
+function playRestEndBeep(){
+  try{
+    if(!audioCtx)return;
+    const t0=audioCtx.currentTime;
+    [0,0.25,0.5].forEach((d,i)=>{
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.type='sine';o.frequency.value=i===2?1320:880;
+      g.gain.setValueAtTime(0.0001,t0+d);
+      g.gain.exponentialRampToValueAtTime(0.4,t0+d+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+d+0.18);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0+d);o.stop(t0+d+0.2);
+    });
+  }catch(e){}
+  try{navigator.vibrate?.([200,100,200]);}catch(e){} // Android; iOS lo ignora
+}
+// Cuenta atrás calculada con la hora de fin (no con un contador), así sigue siendo exacta aunque iOS
+// congele los timers con la pantalla apagada. Se repinta solo este componente.
+function RestTimer({endAt,total,onAdjust,onSkip,onDone}){
+  const [now,setNow]=useState(Date.now());
+  const finished=now>=endAt;
+  const firedRef=useRef(false);
+  useEffect(()=>{firedRef.current=false;setNow(Date.now());},[endAt]);
+  useEffect(()=>{
+    const tick=()=>setNow(Date.now());
+    const id=setInterval(tick,250);
+    document.addEventListener('visibilitychange',tick);
+    return()=>{clearInterval(id);document.removeEventListener('visibilitychange',tick);};
+  },[]);
+  useEffect(()=>{
+    if(!finished||firedRef.current)return;
+    firedRef.current=true;
+    // Si la app estaba en segundo plano cuando terminó, no pitar al volver mucho después
+    if(document.visibilityState==='visible'&&Date.now()-endAt<5000)playRestEndBeep();
+    const t=setTimeout(onDone,4000);
+    return()=>clearTimeout(t);
+  },[finished]);
+  // Mantener la pantalla encendida durante el descanso, si el navegador lo permite
+  useEffect(()=>{
+    let lock=null,cancelled=false;
+    const req=()=>{
+      if(cancelled||document.visibilityState!=='visible'||!navigator.wakeLock)return;
+      navigator.wakeLock.request('screen').then(l=>{if(cancelled)l.release();else lock=l;}).catch(()=>{});
+    };
+    req();
+    document.addEventListener('visibilitychange',req); // el bloqueo se pierde al salir de la app
+    return()=>{cancelled=true;document.removeEventListener('visibilitychange',req);lock?.release().catch(()=>{});};
+  },[]);
+  const left=Math.max(0,Math.ceil((endAt-now)/1000));
+  const pct=total>0?Math.min(100,(left/total)*100):0;
+  return h('div',{className:'rest-bar'+(finished?' finished':''),role:'timer','aria-live':finished?'assertive':'off'},
+    h('div',{className:'rest-inner'},
+      h('div',{className:'rest-time'},finished?'¡Ya!':fmtDuration(left)),
+      h('div',{style:{flex:1,minWidth:0}},
+        h('div',{className:'rest-label'},finished?'A por la siguiente serie':'Descanso'),
+        h('div',{className:'rest-track'},h('div',{className:'rest-fill',style:{width:pct+'%'}}))
+      ),
+      !finished&&h('div',{className:'rest-btns'},
+        h('button',{className:'btn btns btnsm',style:{padding:'0 10px'},onClick:()=>onAdjust(-15)},'−15'),
+        h('button',{className:'btn btns btnsm',style:{padding:'0 10px'},onClick:()=>onAdjust(15)},'+15'),
+        h('button',{className:'btn btnp btnsm',onClick:onSkip},'Saltar')
+      ),
+      finished&&h('button',{className:'btn btns btnsm',onClick:onSkip},'Cerrar')
+    )
+  );
+}
+
 const DRAFT_KEY='il_draft';
 const INACTIVITY_MS=15*60*1000;
 
@@ -1464,7 +1787,25 @@ function WorkoutTimer({timerStart,lastActivity,pausedAt,onAutoPause}){
   );
 }
 
-function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onAddToLibrary,onActiveSessionChange}){
+// Nombre para guardar la sesión actual como rutina
+function RoutineNameModal({initialName,onSave,onClose}){
+  const [name,setName]=useState(initialName||'');
+  function save(){if(!name.trim()){alert('Escribe un nombre');return;}onSave(name.trim());onClose();}
+  return h('div',{className:'overlay',onClick:e=>{if(e.target===e.currentTarget)onClose();}},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modaltitle'},'Guardar como rutina'),
+      h('div',{className:'fg'},h('label',null,'Nombre'),h('input',{value:name,onChange:e=>setName(e.target.value),placeholder:'Ej: Torso A',autoFocus:true})),
+      h('div',{className:'method-note',style:{marginTop:0,marginBottom:12}},'Se guardan los ejercicios en este orden, sin las series. Puedes editarla después en Ejercicios → Rutinas.'),
+      h('div',{style:{display:'flex',gap:8}},
+        h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar'),
+        h('button',{className:'btn btns',onClick:onClose},'Cancelar')
+      )
+    )
+  );
+}
+
+function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToProfile,onAddToLibrary,onAddRoutine,onActiveSessionChange}){
   const [exercises,setExercises]=useState(()=>{
     // Restore draft on mount if one exists
     try{const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');return (d?.exercises||[]).map(migrateExercise);}catch{return[];}
@@ -1481,6 +1822,13 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   const [showNewEx,setShowNewEx]=useState(false);
   const [newExName,setNewExName]=useState('');
   const [completedSession,setCompletedSession]=useState(null);
+  const [showRoutineName,setShowRoutineName]=useState(false);
+  // Descanso en curso: {endAt, total} o null. La duración por defecto se recuerda entre sesiones
+  const [rest,setRest]=useState(null);
+  const [restSecs,setRestSecs]=useState(()=>{const v=loadState(REST_KEY,90);return REST_OPTIONS.includes(v)?v:90;});
+  function startRest(){unlockAudio();setRest({endAt:Date.now()+restSecs*1000,total:restSecs});}
+  function adjustRest(d){setRest(r=>r&&{endAt:Math.max(Date.now(),r.endAt+d*1000),total:Math.max(1,r.total+d)});}
+  function changeRestSecs(v){setRestSecs(v);saveState(REST_KEY,v);}
   const [draftBanner,setDraftBanner]=useState(()=>{
     try{
       const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
@@ -1495,16 +1843,18 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   const firstRender=useRef(true);
   const currentWeight=weightLog.length>0?weightLog[weightLog.length-1].weight:0;
   const estTotal=currentWeight>0?calcSessionCals(exercises,currentWeight):null;
-  // Series de la última vez que se hizo cada ejercicio (sessions va de más reciente a más antigua).
+  // Cada ejercicio tal como se hizo la última vez (series y variante; sessions va de más reciente a más antigua).
   // Memoizado: antes se recorría todo el historial por cada ejercicio en cada tick del cronómetro.
-  const prevSetsMap=useMemo(()=>{
+  const prevExMap=useMemo(()=>{
     const byKey={},byName={};
     sessions.forEach(s=>s.exercises.forEach(x=>{
-      if(!(exKey(x) in byKey))byKey[exKey(x)]=x.sets;
-      if(!(x.name in byName))byName[x.name]=x.sets;
+      if(!(exKey(x) in byKey))byKey[exKey(x)]=x;
+      if(!(x.name in byName))byName[x.name]=x;
     }));
     return {byKey,byName};
   },[sessions]);
+  const prevExFor=e=>prevExMap.byKey[exKey(e)]||prevExMap.byName[e.name]||null;
+  const libById=useMemo(()=>Object.fromEntries(library.map(e=>[e.id,e])),[library]);
 
   // Autosave draft whenever relevant state changes
   useEffect(()=>{
@@ -1543,16 +1893,32 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     }
   },[exercises]);
 
+  // Nuevo ejercicio de sesión con la variante de la última vez
+  const fromLibrary=libEx=>newSessionExercise(libEx,prevExMap.byKey['id:'+libEx.id]?.variant);
   function selectFromLibrary(libEx){
     setDraftBanner(null);
-    setExercises(prev=>[...prev,newSessionExercise(libEx)]);
+    setExercises(prev=>[...prev,fromLibrary(libEx)]);
     // Scroll to bottom after render
     setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth',block:'end'}),80);
+  }
+  // Añade los ejercicios de la rutina que aún no estén en la sesión (no borra nada de lo que hay)
+  function loadRoutine(r){
+    setDraftBanner(null);
+    setExercises(prev=>{
+      const have=new Set(prev.map(e=>e.libraryId));
+      const add=r.items.map(id=>libById[id]).filter(x=>x&&!have.has(x.id)).map(fromLibrary);
+      return add.length?[...prev,...add]:prev;
+    });
+  }
+  function saveAsRoutine(name){
+    const items=[...new Set(exercises.map(e=>e.libraryId).filter(id=>id&&libById[id]))];
+    if(!items.length){alert('Ningún ejercicio de la sesión está en la biblioteca.');return;}
+    onAddRoutine({id:'r-'+Date.now(),name,items});
   }
   function saveNewToLibrary(libEx){onAddToLibrary(libEx);selectFromLibrary(libEx);}
   function discardSession(){
     if(!confirm('¿Descartar la sesión actual? Se perderán todos los ejercicios y series.'))return;
-    setExercises([]);setTimerStart(null);setPausedAt(null);
+    setExercises([]);setTimerStart(null);setPausedAt(null);setRest(null);
     setDraftBanner(null);
     localStorage.removeItem(DRAFT_KEY);
   }
@@ -1567,7 +1933,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     const durationSecs=timerStart?Math.floor((realEnd-timerStart)/1000):0;
     const session={id:Date.now(),date:new Date().toISOString(),exercises:cleaned,...sessionTotals(cleaned,currentWeight),durationSecs};
     onSave(session);
-    setExercises([]);setTimerStart(null);setPausedAt(null);
+    setExercises([]);setTimerStart(null);setPausedAt(null);setRest(null);
     setDraftBanner(null);
     localStorage.removeItem(DRAFT_KEY);
     setCompletedSession(session);
@@ -1575,6 +1941,7 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
   return h('div',{className:'content'},
     showNewEx&&h(NewExerciseModal,{initialName:newExName,onSave:saveNewToLibrary,onClose:()=>setShowNewEx(false)}),
     completedSession&&h(SessionCompleteModal,{session:completedSession,onClose:()=>setCompletedSession(null)}),
+    showRoutineName&&h(RoutineNameModal,{onSave:saveAsRoutine,onClose:()=>setShowRoutineName(false)}),
     h('div',{className:'ptitle'},'HOY'),
     h('div',{className:'psub'},new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})),
     h(ProfileBanner,{profile,weightLog,onGoToProfile}),
@@ -1592,45 +1959,149 @@ function WorkoutTab({sessions,library,onSave,profile,weightLog,onGoToProfile,onA
     exercises.length>0&&estTotal!==null&&h('div',{className:'cal-preview'},
       h('div',null,h('div',{className:'kcal-num'},'🔥 '+estTotal+' kcal'),h('div',{className:'kcal-sub'},'estimadas esta sesión'),h('div',{className:'kcal-note'},'Se actualiza en tiempo real'))
     ),
+    routines.length>0&&h('div',{className:'card'},
+      h('div',{className:'cardtitle',style:{marginBottom:10}},
+        h('span',null,'Rutinas'),
+        exercises.length>0&&h('span',{style:{textTransform:'none',letterSpacing:0,fontWeight:400}},'se añaden a la sesión')
+      ),
+      h('div',{className:'routine-chips'},
+        routines.map(r=>h('button',{key:r.id,className:'pbtn',onClick:()=>loadRoutine(r)},r.name))
+      )
+    ),
     h('div',{className:'card'},
       h('div',{className:'cardtitle',style:{marginBottom:10}},'Añadir ejercicio'),
       h(ExercisePicker,{library,onSelect:selectFromLibrary,onCreateNew:(n)=>{setNewExName(n);setShowNewEx(true);}})
     ),
     exercises.length>0&&h('div',{className:'card'},
-      h('div',{className:'cardtitle'},'Esta sesión ('+(exercises.length)+')'),
-      exercises.map((e,i)=>{
-        const prevSets=prevSetsMap.byKey[exKey(e)]||prevSetsMap.byName[e.name]||[];
-        return h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>{
+      h('div',{className:'cardtitle'},
+        h('span',null,'Esta sesión ('+(exercises.length)+')'),
+        h('button',{className:'btn btns btnsm',onClick:()=>setShowRoutineName(true)},'Guardar como rutina')
+      ),
+      h('div',{className:'rest-setting',style:{marginBottom:12}},
+        h('label',{htmlFor:'rest-secs'},'Descanso al marcar ✓'),
+        h('select',{id:'rest-secs',value:restSecs,onChange:e=>changeRestSecs(Number(e.target.value))},
+          REST_OPTIONS.map(v=>h('option',{key:v,value:v},v+' s')))
+      ),
+      exercises.map((e,i)=>h(ExerciseBlock,{key:e.id,ex:e,onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),onRemove:()=>{
           // Solo pedimos confirmación si hay datos que perder
           if(exerciseHasData(e)&&!confirm('¿Eliminar "'+e.name+'" y todas sus series?'))return;
           setExercises(prev=>prev.filter((_,j)=>j!==i));
-        },bw:currentWeight,prevSets});
-      })
+        },bw:currentWeight,variants:libById[e.libraryId]?.variants||[],prevEx:prevExFor(e),onSetDone:startRest}))
     ),
     h('div',{style:{display:'flex',gap:10}},
       h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar sesión'),
       exercises.length>0&&h('button',{className:'btn btns',onClick:discardSession},'Descartar')
     ),
+    rest&&h(RestTimer,{endAt:rest.endAt,total:rest.total,onAdjust:adjustRest,onSkip:()=>setRest(null),onDone:()=>setRest(null)}),
+    // Hueco para que la barra de descanso no tape el final de la página
+    rest&&h('div',{style:{height:72}}),
     h('div',{ref:bottomRef})
   );
 }
 
 // ---- Library Tab ----
-function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
+// Editor de una rutina: nombre y ejercicios (ordenar, quitar, añadir)
+function RoutineEditModal({routine,library,onSave,onDelete,onClose}){
+  const [name,setName]=useState(routine.name);
+  const [items,setItems]=useState(routine.items);
+  const [askDelete,setAskDelete]=useState(false);
+  const libById=useMemo(()=>Object.fromEntries(library.map(e=>[e.id,e])),[library]);
+  function move(i,d){const n=[...items];[n[i],n[i+d]]=[n[i+d],n[i]];setItems(n);}
+  function save(){
+    if(!name.trim()){alert('Escribe un nombre');return;}
+    // Los ejercicios borrados de la biblioteca se quitan al guardar
+    onSave({...routine,name:name.trim(),items:items.filter(id=>libById[id])});
+    onClose();
+  }
+  // Sin cierre al tocar el fondo: se perderían los cambios por accidente
+  return h('div',{className:'overlay'},
+    h('div',{className:'modal'},
+      h('div',{className:'modal-handle'}),
+      h('div',{className:'modaltitle'},routine.isNew?'Nueva rutina':'Editar rutina'),
+      h('div',{className:'fg'},h('label',null,'Nombre'),h('input',{value:name,onChange:e=>setName(e.target.value),placeholder:'Ej: Torso A'})),
+      h('div',{className:'fg',style:{marginBottom:4}},h('label',null,'Ejercicios ('+items.length+')')),
+      items.length===0&&h('div',{style:{fontSize:13,color:'var(--t2)',padding:'8px 0'}},'Todavía no hay ejercicios.'),
+      items.map((id,i)=>h('div',{key:id,className:'routine-item'},
+        h('span',{className:'routine-item-name'},libById[id]?.name||h('em',{style:{color:'var(--t2)'}},'(ejercicio eliminado)')),
+        h('button',{className:'icon-btn',disabled:i===0,onClick:()=>move(i,-1),'aria-label':'Subir'},'↑'),
+        h('button',{className:'icon-btn',disabled:i===items.length-1,onClick:()=>move(i,1),'aria-label':'Bajar'},'↓'),
+        h('button',{className:'icon-btn',onClick:()=>setItems(items.filter((_,j)=>j!==i)),'aria-label':'Quitar'},'×')
+      )),
+      h('div',{style:{margin:'12px 0'}},
+        h(ExercisePicker,{library,onSelect:ex=>{if(!items.includes(ex.id))setItems([...items,ex.id]);}})
+      ),
+      h('div',{style:{display:'flex',gap:8,marginTop:8}},
+        h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar cambios'),
+        h('button',{className:'btn btns',onClick:onClose},'Cancelar')
+      ),
+      onDelete&&h('div',{style:{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8,marginTop:14}},
+        askDelete
+          ? h(React.Fragment,null,
+              h('span',{style:{fontSize:13,color:'var(--t2)'}},'¿Eliminar la rutina?'),
+              h('button',{className:'btnd',onClick:()=>{onDelete(routine.id);onClose();}},'Sí, eliminar'),
+              h('button',{className:'btn btns btnsm',onClick:()=>setAskDelete(false)},'No')
+            )
+          : h('button',{className:'btnd',onClick:()=>setAskDelete(true)},'Eliminar rutina')
+      )
+    )
+  );
+}
+
+function RoutinesSection({routines,library,onAdd,onUpdate,onRemove}){
+  const [editing,setEditing]=useState(null);
+  const libById=useMemo(()=>Object.fromEntries(library.map(e=>[e.id,e])),[library]);
+  // Una rutina nueva no se añade hasta guardarla (cancelar no deja una vacía)
+  function create(){setEditing({id:'r-'+Date.now(),name:'',items:[],isNew:true});}
+  function save({isNew,...r}){isNew?onAdd(r):onUpdate(r);}
+  return h('div',null,
+    editing&&h(RoutineEditModal,{routine:editing,library,onSave:save,onClose:()=>setEditing(null),
+      onDelete:editing.isNew?null:onRemove}),
+    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:12}},
+      h('div',{style:{fontSize:13,color:'var(--t2)',lineHeight:1.5}},'Se cargan desde la pestaña Hoy. También puedes guardar una sesión como rutina.'),
+      h('button',{className:'btn btnp btnsm',style:{flexShrink:0},onClick:create},'+ Nueva')
+    ),
+    h('div',{className:'card'},
+      routines.length===0
+        ? h('div',{className:'empty'},h('div',{className:'empty-icon'},'📋'),h('div',null,'No hay rutinas'))
+        : routines.map(r=>{
+            const names=r.items.map(id=>libById[id]?.name).filter(Boolean);
+            return h('div',{key:r.id,className:'lib-ex-row'},
+              h('div',{style:{flex:1,minWidth:0}},
+                h('div',{className:'lib-ex-name'},r.name),
+                h('div',{style:{fontSize:12,color:'var(--t2)',marginTop:3,lineHeight:1.45}},
+                  names.length?names.join(' · '):'Sin ejercicios')
+              ),
+              h('button',{className:'btn btns btnsm',style:{flexShrink:0,marginLeft:10},onClick:()=>setEditing(r)},'Editar')
+            );
+          })
+    )
+  );
+}
+
+function LibraryTab({library,sessions,routines,onAdd,onRemove,onEdit,onAddRoutine,onUpdateRoutine,onRemoveRoutine}){
+  const [view,setView]=useState('exercises');
   const [filter,setFilter]=useState('Todos');
   const [showModal,setShowModal]=useState(false);
-  const [editingEx,setEditingEx]=useState(null); // {id, name, muscle}
+  const [editingEx,setEditingEx]=useState(null); // {id, name, muscle, isCardio, mode, variantsText}
   const usageMap=useMemo(()=>{const m={};sessions.forEach(s=>s.exercises.forEach(e=>{if(e.libraryId)m[e.libraryId]=(m[e.libraryId]||0)+1;}));return m;},[sessions]);
   const filtered=filter==='Todos'?library:library.filter(e=>e.muscle===filter);
-  // Un ejercicio con sesiones no puede pasar de fuerza a cardio (o al revés): su historial tiene
-  // series de otro tipo (peso/reps frente a minutos/km) y mezclaría estadísticas y referencias
+  // Un ejercicio con sesiones no puede cambiar de tipo de registro (fuerza/cardio, peso/peso corporal/tiempo):
+  // su historial tiene series de otro tipo y mezclaría estadísticas y referencias
   const editOrig=editingEx&&library.find(e=>e.id===editingEx.id);
   const typeLocked=!!(editOrig&&usageMap[editOrig.id]);
   const muscleOptions=!typeLocked?MUSCLES:MUSCLES.filter(m=>(m==='Cardio')===!!editOrig.isCardio);
 
+  function startEdit(ex){
+    setEditingEx({id:ex.id,name:ex.name,muscle:ex.muscle,isCardio:ex.isCardio,
+      mode:ex.mode||'weight',variantsText:(ex.variants||[]).join('\n')});
+  }
   function saveEdit(){
     if(!editingEx.name.trim()){alert('El nombre no puede estar vacío');return;}
-    onEdit(editingEx);
+    const {variantsText,...rest}=editingEx;
+    const isCardio=rest.muscle==='Cardio';
+    // Variantes vacías se guardan como [] (no undefined) para que la migración no restaure las de por defecto
+    onEdit({...rest,name:rest.name.trim(),isCardio,mode:isCardio?undefined:rest.mode,
+      variants:isCardio?undefined:parseVariants(variantsText)});
     setEditingEx(null);
   }
 
@@ -1654,11 +2125,14 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
           h('select',{value:editingEx.muscle,disabled:muscleOptions.length===1,onChange:e=>setEditingEx({...editingEx,muscle:e.target.value,isCardio:e.target.value==='Cardio'})},
             muscleOptions.map(m=>h('option',{key:m},m))
           ),
-          typeLocked&&h('div',{style:{fontSize:11,color:'var(--t2)',marginTop:2}},
-            editOrig.isCardio
-              ?'Tiene sesiones registradas: no puede pasar a ser de fuerza.'
-              :'Tiene sesiones registradas: no puede pasar a ser de cardio.')
+          typeLocked&&editOrig.isCardio&&h('div',{style:{fontSize:11,color:'var(--t2)',marginTop:2}},
+            'Tiene sesiones registradas: no puede pasar a ser de fuerza.')
         ),
+        editingEx.muscle!=='Cardio'&&h(ModeAndVariantsFields,{
+          mode:editingEx.mode,onMode:m=>setEditingEx({...editingEx,mode:m}),
+          variantsText:editingEx.variantsText,onVariants:t=>setEditingEx({...editingEx,variantsText:t}),
+          modeLocked:typeLocked
+        }),
         h('div',{style:{display:'flex',gap:8,marginTop:8}},
           h('button',{className:'btn btnp',style:{flex:1},onClick:saveEdit},'Guardar cambios'),
           h('button',{className:'btn btns',onClick:()=>setEditingEx(null)},'Cancelar')
@@ -1667,34 +2141,41 @@ function LibraryTab({library,sessions,onAdd,onRemove,onEdit}){
     ),
 
     h('div',{className:'ptitle'},'BIBLIOTECA'),
-    h('div',{className:'psub'},library.length+' ejercicios disponibles'),
-    h('div',{style:{display:'flex',justifyContent:'flex-end',marginBottom:12}},
-      h('button',{className:'btn btnp btnsm',onClick:()=>setShowModal(true)},'+ Nuevo ejercicio')
+    h('div',{className:'psub'},library.length+' ejercicios · '+routines.length+' rutina'+(routines.length===1?'':'s')),
+    h('div',{className:'periodtabs'},
+      [['exercises','Ejercicios'],['routines','Rutinas']].map(([id,label])=>
+        h('button',{key:id,className:'pbtn'+(view===id?' active':''),onClick:()=>setView(id)},label))
     ),
-    h('div',{className:'lib-filter'},['Todos',...MUSCLES].map(m=>
-      h('button',{key:m,className:'lib-filter-btn'+(filter===m?' active':''),onClick:()=>setFilter(m)},m)
-    )),
-    h('div',{className:'card'},
-      filtered.length===0
-        ? h('div',{className:'empty'},h('div',{className:'empty-icon'},'🔍'),h('div',null,'Sin ejercicios en este grupo'))
-        : filtered.map(ex=>h('div',{key:ex.id,className:'lib-ex-row'},
-            h('div',{style:{flex:1,minWidth:0}},
-              h('div',{className:'lib-ex-name'},ex.name),
-              h('div',{style:{display:'flex',gap:6,marginTop:4,alignItems:'center'}},
-                h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle),
-                usageMap[ex.id]&&h('span',{style:{fontSize:11,color:'var(--t2)'}},
-                  usageMap[ex.id]+' '+(usageMap[ex.id]===1?'vez':'veces'))
-              )
-            ),
-            h('div',{style:{display:'flex',gap:6,flexShrink:0}},
-              h('button',{
-                className:'btn btns btnsm',
-                onClick:()=>setEditingEx({id:ex.id,name:ex.name,muscle:ex.muscle,isCardio:ex.isCardio})
-              },'Editar'),
-              String(ex.id).startsWith('c-')&&h('button',{className:'btnd',onClick:()=>onRemove(ex.id)},'Eliminar')
-            )
-          ))
-    )
+    view==='routines'
+      ? h(RoutinesSection,{routines,library,onAdd:onAddRoutine,onUpdate:onUpdateRoutine,onRemove:onRemoveRoutine})
+      : h(React.Fragment,null,
+          h('div',{style:{display:'flex',justifyContent:'flex-end',marginBottom:12}},
+            h('button',{className:'btn btnp btnsm',onClick:()=>setShowModal(true)},'+ Nuevo ejercicio')
+          ),
+          h('div',{className:'lib-filter'},['Todos',...MUSCLES].map(m=>
+            h('button',{key:m,className:'lib-filter-btn'+(filter===m?' active':''),onClick:()=>setFilter(m)},m)
+          )),
+          h('div',{className:'card'},
+            filtered.length===0
+              ? h('div',{className:'empty'},h('div',{className:'empty-icon'},'🔍'),h('div',null,'Sin ejercicios en este grupo'))
+              : filtered.map(ex=>h('div',{key:ex.id,className:'lib-ex-row'},
+                  h('div',{style:{flex:1,minWidth:0}},
+                    h('div',{className:'lib-ex-name'},ex.name),
+                    h('div',{style:{display:'flex',gap:6,marginTop:4,alignItems:'center',flexWrap:'wrap'}},
+                      h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle),
+                      !ex.isCardio&&ex.mode&&ex.mode!=='weight'&&h('span',{className:'sbadge',style:{padding:'2px 7px'}},MODE_LABELS[ex.mode]),
+                      !ex.isCardio&&ex.variants?.length>0&&h('span',{style:{fontSize:11,color:'var(--t2)'}},ex.variants.length+' variantes'),
+                      usageMap[ex.id]&&h('span',{style:{fontSize:11,color:'var(--t2)'}},
+                        usageMap[ex.id]+' '+(usageMap[ex.id]===1?'vez':'veces'))
+                    )
+                  ),
+                  h('div',{style:{display:'flex',gap:6,flexShrink:0}},
+                    h('button',{className:'btn btns btnsm',onClick:()=>startEdit(ex)},'Editar'),
+                    String(ex.id).startsWith('c-')&&h('button',{className:'btnd',onClick:()=>onRemove(ex.id)},'Eliminar')
+                  )
+                ))
+          )
+        )
   );
 }
 
@@ -1720,10 +2201,35 @@ function SessionDetail({session,onDelete,onEdit}){
     h('div',{className:'session-detail-exercises'},
       session.exercises.map(ex=>h('div',{key:ex.id,className:'sde-row'},
         h('div',{className:'sde-header'},
-          h('span',{className:'sde-name'},ex.name),
+          h('span',{className:'sde-name'},ex.name,ex.variant&&h('span',{style:{fontWeight:400,color:'var(--t2)'}},' · '+ex.variant)),
           h('span',{className:`tag ${MUSCLE_COLORS[ex.muscle]||'tb'}`},ex.muscle)
         ),
-        ex.isCardio
+        exMode(ex)==='time'
+          ? h('div',{className:'sde-sets'},
+              ex.sets.map((s,i)=>{
+                const secs=parseFloat(s.secs)||0;
+                if(!secs)return null;
+                return h('div',{key:s.id||i,className:'sde-set'},
+                  h('span',{className:'sde-set-num'},'#'+(i+1)),
+                  h('span',{className:'sde-set-weight'},secs+' s')
+                );
+              }).filter(Boolean)
+            )
+        : exMode(ex)==='bodyweight'
+          ? h('div',{className:'sde-sets'},
+              ex.sets.map((s,i)=>{
+                const w=parseFloat(s.weight)||0, r=parseInt(s.reps)||0;
+                if(!r)return null;
+                return h('div',{key:s.id||i,className:'sde-set'},
+                  h('span',{className:'sde-set-num'},'#'+(i+1)),
+                  h('span',{className:'sde-set-weight'},r+' reps'),
+                  w?h('span',{className:'sde-set-x'},'+'):null,
+                  w?h('span',{className:'sde-set-reps'},w+' kg'):null,
+                  w?h('span',{className:'sde-set-vol'},(w*r).toLocaleString('es-ES')+' kg'):null
+                );
+              }).filter(Boolean)
+            )
+        : ex.isCardio
           ? h('div',{className:'sde-sets'},
               ex.sets.map((s,i)=>{
                 const d=parseFloat(s.duration)||0;
@@ -1766,6 +2272,7 @@ function SessionEditModal({session,library,weightLog,onSave,onClose}){
   const [exercises,setExercises]=useState(()=>session.exercises.map(e=>({...e,sets:e.sets.map(s=>({...s}))})));
   // Las calorías se recalculan con el peso corporal registrado en la fecha de la sesión
   const bw=weightAt(weightLog,session.date);
+  const libById=useMemo(()=>Object.fromEntries(library.map(e=>[e.id,e])),[library]);
 
   function save(){
     const cleaned=cleanExercises(exercises);
@@ -1782,7 +2289,7 @@ function SessionEditModal({session,library,weightLog,onSave,onClose}){
       h('div',{className:'modal-handle'}),
       h('div',{className:'modaltitle',style:{marginBottom:4}},'Editar sesión'),
       h('div',{className:'psub'},fmtDate(session.date)),
-      exercises.map((e,i)=>h(ExerciseBlock,{key:e.id,ex:e,bw,
+      exercises.map((e,i)=>h(ExerciseBlock,{key:e.id,ex:e,bw,variants:libById[e.libraryId]?.variants||[],
         onChange:ex=>setExercises(prev=>prev.map((x,j)=>j===i?ex:x)),
         onRemove:()=>{
           if(exerciseHasData(e)&&!confirm('¿Eliminar "'+e.name+'" de esta sesión?'))return;
@@ -1832,6 +2339,7 @@ function HistoryTab({sessions,library,weightLog,onDelete,onUpdate}){
                 h('div',{className:'hcard-meta'},
                   strEx.length>0&&h('span',{className:'sbadge'},strEx.length+' ejercicios'),
                   s.totalVolume>0&&h('span',{className:'sbadge'},Math.round(s.totalVolume).toLocaleString('es-ES')+' kg'),
+                  bodyweightReps(s.exercises)>0&&h('span',{className:'sbadge'},bodyweightReps(s.exercises)+' reps'),
                   s.durationSecs>0&&h('span',{className:'sbadge'},'⏱ '+fmtDuration(s.durationSecs)),
                   cardioEx.length>0&&h('span',{className:'sbadge'},'🏃 '+s.totalCardioMin+' min'+(s.totalCardioKm>0?' · '+(Math.round(s.totalCardioKm*10)/10)+' km':'')),
                   s.calories>0&&h('span',{className:'sbadge sbadge-cal'},'🔥 '+s.calories+' kcal')
@@ -1948,6 +2456,7 @@ function StatsTab({sessions,library,day}){
   const totalCal=filtered.reduce((s,x)=>s+(x.calories||0),0);
   const totalCardio=filtered.reduce((s,x)=>s+(x.totalCardioMin||0),0);
   const totalKm=filtered.reduce((s,x)=>s+(x.totalCardioKm||0),0);
+  const totalBwReps=filtered.reduce((s,x)=>s+bodyweightReps(x.exercises),0);
   const avgDurSecs=filtered.filter(s=>s.durationSecs>0).length>0
     ?Math.round(filtered.filter(s=>s.durationSecs>0).reduce((t,s)=>t+(s.durationSecs||0),0)/filtered.filter(s=>s.durationSecs>0).length)
     :0;
@@ -1962,20 +2471,25 @@ function StatsTab({sessions,library,day}){
     };
   },[buckets,filtered]);
 
-  // Ejercicios de fuerza agrupados por libraryId (sobrevive a renombrados); nombre actual de la biblioteca
+  // Ejercicios de fuerza agrupados por libraryId (sobrevive a renombrados); nombre y modo actuales de la biblioteca.
+  // La progresión mide lo que importa en cada modo: kg máximos, reps máximas en una serie o segundos máximos.
   const {strengthEx,exList,maxW}=useMemo(()=>{
-    const libName=Object.fromEntries(library.map(e=>[e.id,e.name]));
+    const libById=Object.fromEntries(library.map(e=>[e.id,e]));
     const all={};
     sessions.forEach(s=>s.exercises.forEach(e=>{
       if(e.isCardio)return;
       const k=exKey(e);
-      if(!all[k])all[k]={key:k,name:libName[e.libraryId]||e.name,max:0,cnt:0,muscle:e.muscle};
-      const mw=Math.max(0,...e.sets.map(s=>parseFloat(s.weight)||0));
-      if(mw>all[k].max)all[k].max=mw;
+      const lib=libById[e.libraryId];
+      if(!all[k])all[k]={key:k,name:lib?.name||e.name,mode:lib?exMode(lib):exMode(e),max:0,cnt:0,muscle:e.muscle};
+      if(exMode(e)==='weight'){
+        const mw=Math.max(0,...e.sets.map(s=>parseFloat(s.weight)||0));
+        if(mw>all[k].max)all[k].max=mw;
+      }
       all[k].cnt++;
     }));
     const list=Object.values(all);
-    const top=[...list].sort((a,b)=>b.cnt-a.cnt).slice(0,6);
+    // "Peso máximo" solo tiene sentido en los ejercicios con peso
+    const top=list.filter(e=>e.mode==='weight'&&e.max>0).sort((a,b)=>b.cnt-a.cnt).slice(0,6);
     return {
       strengthEx:[...list].sort((a,b)=>a.name.localeCompare(b.name,'es')),
       exList:top,
@@ -1983,34 +2497,45 @@ function StatsTab({sessions,library,day}){
     };
   },[sessions,library]);
   const selKey=strengthEx.some(e=>e.key===selEx)?selEx:(strengthEx[0]?.key||'');
+  const selMode=strengthEx.find(e=>e.key===selKey)?.mode||'weight';
+  const PROGRESS={
+    weight:{title:'Progresión de peso',unit:'kg',field:'weight'},
+    bodyweight:{title:'Progresión de repeticiones',unit:'reps',field:'reps'},
+    time:{title:'Progresión de tiempo',unit:'s',field:'secs'},
+  }[selMode];
   const exHistory=useMemo(()=>sessions.slice().reverse().filter(s=>s.exercises.some(e=>exKey(e)===selKey)).map(s=>{
     const ex=s.exercises.find(e=>exKey(e)===selKey);
-    return {date:fmtShort(s.date),maxW:Math.max(0,...ex.sets.map(s=>parseFloat(s.weight)||0))};
-  }),[sessions,selKey]);
+    return {date:fmtShort(s.date),max:Math.max(0,...ex.sets.map(s=>parseFloat(s[PROGRESS.field])||0))};
+  }),[sessions,selKey,PROGRESS.field]);
   const exLabels=useMemo(()=>exHistory.map(e=>e.date),[exHistory]);
-  const exData=useMemo(()=>exHistory.map(e=>e.maxW),[exHistory]);
+  const exData=useMemo(()=>exHistory.map(e=>e.max),[exHistory]);
 
   return h('div',{className:'content'},
     h('div',{className:'ptitle'},'ESTADÍSTICAS'),
     h('div',{className:'psub'},'Evolución y rendimiento'),
     h('div',{className:'periodtabs'},['week','month','year'].map((p,i)=>h('button',{key:p,className:'pbtn'+(period===p?' active':''),onClick:()=>setPeriod(p)},['Semana','Mes','Año'][i]))),
     h('div',{className:'mgrid'},
-      (totalKm>0?
-        [{l:'Sesiones',v:filtered.length,u:''},{l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},{l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},{l:'Cardio',v:Math.round(totalKm*10)/10,u:'km'},{l:'Duración media',v:avgDurSecs>0?fmtDuration(avgDurSecs):'—',u:''},{l:'Tiempo cardio',v:totalCardio,u:'min'}]
-        :[{l:'Sesiones',v:filtered.length,u:''},{l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},{l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},{l:'Duración media',v:avgDurSecs>0?fmtDuration(avgDurSecs):'—',u:''}])
-        .map(m=>h('div',{key:m.l,className:'mcard'},h('div',{className:'mlabel'},m.l),h('div',{className:'mval'},m.v,m.u&&h('span',{className:'unit'},' '+m.u))))
+      [
+        {l:'Sesiones',v:filtered.length,u:''},
+        {l:'Volumen',v:Math.round(totalVol).toLocaleString('es-ES'),u:'kg'},
+        {l:'Calorías',v:totalCal.toLocaleString('es-ES'),u:'kcal'},
+        {l:'Duración media',v:avgDurSecs>0?fmtDuration(avgDurSecs):'—',u:''},
+        ...(totalBwReps>0?[{l:'Reps peso corporal',v:totalBwReps.toLocaleString('es-ES'),u:'reps'}]:[]),
+        ...(totalKm>0?[{l:'Cardio',v:Math.round(totalKm*10)/10,u:'km'}]:[]),
+        ...(totalKm>0?[{l:'Tiempo cardio',v:totalCardio,u:'min'}]:[]),
+      ].map(m=>h('div',{key:m.l,className:'mcard'},h('div',{className:'mlabel'},m.l),h('div',{className:'mval'},m.v,m.u&&h('span',{className:'unit'},' '+m.u))))
     ),
     h(TrainingCalendar,{sessions}),
     h('div',{className:'card'},h('div',{className:'cardtitle'},'Volumen (kg)'),h(BarChart,{labels,data:volData,color:'#E24B4A'})),
     h('div',{className:'card'},h('div',{className:'cardtitle'},'Calorías (kcal)'),h(BarChart,{labels,data:calData,color:'#BA7517'})),
     exHistory.length>1&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},
-        h('span',null,'Progresión de peso'),
+        h('span',null,PROGRESS.title),
         h('select',{value:selKey,onChange:e=>setSelEx(e.target.value),style:{height:26,fontSize:12,border:'0.5px solid var(--border2)',borderRadius:6,background:'var(--bg2)',color:'var(--t1)',fontFamily:'inherit',padding:'0 6px'}},
           strengthEx.map(e=>h('option',{key:e.key,value:e.key},e.name))
         )
       ),
-      h(LineChart,{labels:exLabels,data:exData,color:'#E24B4A'})
+      h(LineChart,{labels:exLabels,data:exData,color:'#E24B4A',unit:PROGRESS.unit})
     ),
     exList.length>0&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},'Peso máximo por ejercicio'),
@@ -2026,8 +2551,8 @@ function StatsTab({sessions,library,day}){
 }
 
 // ---- Backup Tab ----
-function downloadBackup({sessions,library,profile,weightLog}){
-  const payload={version:2,exportedAt:new Date().toISOString(),sessions,library,profile,weightLog};
+function downloadBackup({sessions,library,profile,weightLog,routines}){
+  const payload={version:3,exportedAt:new Date().toISOString(),sessions,library,profile,weightLog,routines};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -2057,19 +2582,20 @@ function validateBackup(data){
   });
   if(data.weightLog!=null&&!Array.isArray(data.weightLog))fail('el registro de peso no es una lista.');
   if(data.profile!=null&&typeof data.profile!=='object')fail('el perfil no es válido.');
+  if(data.routines!=null&&!Array.isArray(data.routines))fail('las rutinas no son una lista.');
 }
-function BackupTab({sessions,library,profile,weightLog,onRestore,onExported}){
+function BackupTab({sessions,library,profile,weightLog,routines,onRestore,onExported}){
   const [importError,setImportError]=useState('');
   const [importOk,setImportOk]=useState(false);
   const fileRef=useRef();
 
   const dataSize=useMemo(()=>{
-    const raw=JSON.stringify({sessions,library,profile,weightLog});
+    const raw=JSON.stringify({sessions,library,profile,weightLog,routines});
     return (new Blob([raw]).size/1024).toFixed(1);
-  },[sessions,library,profile,weightLog]);
+  },[sessions,library,profile,weightLog,routines]);
 
   function exportData(){
-    downloadBackup({sessions,library,profile,weightLog});
+    downloadBackup({sessions,library,profile,weightLog,routines});
     onExported&&onExported();
   }
 
@@ -2083,7 +2609,8 @@ function BackupTab({sessions,library,profile,weightLog,onRestore,onExported}){
         const data=JSON.parse(ev.target.result);
         validateBackup(data);
         const confirm=window.confirm(
-          `Se van a importar:\n• ${data.sessions.length} sesiones\n• ${data.library.length} ejercicios\n\nEsto reemplazará todos los datos actuales. ¿Continuar?`
+          `Se van a importar:\n• ${data.sessions.length} sesiones\n• ${data.library.length} ejercicios`+
+          (data.routines?`\n• ${data.routines.length} rutinas`:'')+`\n\nEsto reemplazará todos los datos actuales. ¿Continuar?`
         );
         if(!confirm){e.target.value='';return;}
         onRestore(data);
@@ -2107,7 +2634,7 @@ function BackupTab({sessions,library,profile,weightLog,onRestore,onExported}){
       ),
       h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'var(--bg2)',borderRadius:10,marginBottom:14}},
         h('div',null,
-          h('div',{style:{fontSize:13,fontWeight:600,color:'var(--t1)'}},sessions.length+' sesiones · '+library.length+' ejercicios'),
+          h('div',{style:{fontSize:13,fontWeight:600,color:'var(--t1)'}},sessions.length+' sesiones · '+library.length+' ejercicios · '+routines.length+' rutinas'),
           h('div',{style:{fontSize:11,color:'var(--t2)',marginTop:2}},'Tamaño estimado: '+dataSize+' KB')
         ),
         h('div',{style:{fontSize:24}},'📦')
@@ -2159,6 +2686,8 @@ function App(){
   const [library,setLibrary]=useState(()=>migrateLibrary(loadState('il_library',DEFAULT_LIBRARY)));
   const [profile,setProfile]=useState(()=>loadState('il_profile',{name:'',sex:'',dob:''}));
   const [weightLog,setWeightLog]=useState(()=>repairWeightLog(loadState('il_weightlog',[])));
+  // Sin clave guardada (primera vez con rutinas) se cargan las de calistenia por defecto
+  const [routines,setRoutines]=useState(()=>sanitizeRoutines(loadState('il_routines',DEFAULT_ROUTINES)));
   const [hasActiveSession,setHasActiveSession]=useState(false);
   const [lastBackup,setLastBackup]=useState(()=>loadState('il_lastBackup',null));
 
@@ -2169,12 +2698,16 @@ function App(){
   useEffect(()=>saveState('il_library',library),[library]);
   useEffect(()=>saveState('il_profile',profile),[profile]);
   useEffect(()=>saveState('il_weightlog',weightLog),[weightLog]);
+  useEffect(()=>saveState('il_routines',routines),[routines]);
 
   function addSession(s){setSessions(prev=>[s,...prev]);}
   function deleteSession(id){setSessions(prev=>prev.filter(s=>s.id!==id));}
   function updateSession(updated){setSessions(prev=>prev.map(s=>s.id===updated.id?updated:s));}
   function addToLibrary(ex){setLibrary(prev=>[...prev,ex]);}
   function removeFromLibrary(id){setLibrary(prev=>prev.filter(e=>e.id!==id));}
+  function addRoutine(r){setRoutines(prev=>[...prev,r]);}
+  function updateRoutine(r){setRoutines(prev=>prev.map(x=>x.id===r.id?r:x));}
+  function removeRoutine(id){setRoutines(prev=>prev.filter(x=>x.id!==id));}
   function editLibrary(updated){setLibrary(prev=>prev.map(e=>e.id===updated.id?{...e,...updated}:e));}
   function addWeight(entry){setWeightLog(prev=>[...prev,entry].sort((a,b)=>parseLocalDate(a.date)-parseLocalDate(b.date)));}
   function markExported(){const now=Date.now();setLastBackup(now);saveState('il_lastBackup',now);}
@@ -2185,6 +2718,8 @@ function App(){
   function restoreBackup(data){
     setSessions(migrateSessions(data.sessions));
     setLibrary(migrateLibrary(data.library));
+    // Las copias anteriores a las rutinas no las traen: se conservan las actuales
+    if(data.routines)setRoutines(sanitizeRoutines(data.routines));
     if(data.profile)setProfile(data.profile);
     if(data.weightLog)setWeightLog(repairWeightLog(data.weightLog));
   }
@@ -2229,9 +2764,10 @@ function App(){
     ),
     // All tabs stay mounted — only active one is visible.
     h('div',{style:{display:tab==='workout'?'block':'none'}},
-      h(WorkoutTab,{sessions,library,onSave:addSession,profile,weightLog,onGoToProfile:()=>setTab('profile'),onAddToLibrary:addToLibrary,onActiveSessionChange:setHasActiveSession})),
+      h(WorkoutTab,{sessions,library,routines,onAddRoutine:addRoutine,onSave:addSession,profile,weightLog,onGoToProfile:()=>setTab('profile'),onAddToLibrary:addToLibrary,onActiveSessionChange:setHasActiveSession})),
     h('div',{style:{display:tab==='library'?'block':'none'}},
-      h(LibraryTab,{library,sessions,onAdd:addToLibrary,onRemove:removeFromLibrary,onEdit:editLibrary})),
+      h(LibraryTab,{library,sessions,routines,onAdd:addToLibrary,onRemove:removeFromLibrary,onEdit:editLibrary,
+        onAddRoutine:addRoutine,onUpdateRoutine:updateRoutine,onRemoveRoutine:removeRoutine})),
     h('div',{style:{display:tab==='history'?'block':'none'}},
       h(HistoryTab,{sessions,library,weightLog,onDelete:deleteSession,onUpdate:updateSession})),
     h('div',{style:{display:tab==='stats'?'block':'none'}},
@@ -2239,7 +2775,7 @@ function App(){
     h('div',{style:{display:tab==='profile'?'block':'none'}},
       h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions})),
     h('div',{style:{display:tab==='backup'?'block':'none'}},
-      h(BackupTab,{sessions,library,profile,weightLog,onRestore:restoreBackup,onExported:markExported}))
+      h(BackupTab,{sessions,library,profile,weightLog,routines,onRestore:restoreBackup,onExported:markExported}))
   );
 }
 
@@ -2252,7 +2788,7 @@ class ErrorBoundary extends React.Component{
     if(!this.state.error)return this.props.children;
     const rescue=()=>downloadBackup({
       sessions:loadState('il_sessions',[]),library:loadState('il_library',[]),
-      profile:loadState('il_profile',{}),weightLog:loadState('il_weightlog',[]),
+      profile:loadState('il_profile',{}),weightLog:loadState('il_weightlog',[]),routines:loadState('il_routines',[]),
     });
     return h('div',{className:'content'},
       h('div',{className:'card'},
