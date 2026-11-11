@@ -1,11 +1,33 @@
 // IronLog service worker — permite abrir la app sin conexión.
-// Sube la versión de CACHE cuando cambie la lista de ASSETS.
-const CACHE='ironlog-v1';
+// Sube la versión de CACHE cuando cambie la lista de ASSETS. Al crear, renombrar o borrar un archivo
+// de js/ o css/, actualiza también esta lista: si falta uno, la app no arranca sin conexión.
+const CACHE='ironlog-v2';
 const ASSETS=[
   './',
   './index.html',
   './manifest.json',
   './icon-180.png',
+  './css/app.css',
+  './js/main.js',
+  './js/storage.js',
+  './js/core/achievements.js',
+  './js/core/backup.js',
+  './js/core/body.js',
+  './js/core/dates.js',
+  './js/core/library.js',
+  './js/core/progression.js',
+  './js/core/routines.js',
+  './js/core/sessions.js',
+  './js/ui/app.js',
+  './js/ui/backup.js',
+  './js/ui/common.js',
+  './js/ui/exercise.js',
+  './js/ui/history.js',
+  './js/ui/library.js',
+  './js/ui/profile.js',
+  './js/ui/stats.js',
+  './js/ui/summary.js',
+  './js/ui/workout.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js',

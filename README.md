@@ -11,7 +11,7 @@ Registro de entrenamientos de gimnasio y calistenia pensado para el móvil. Es u
   - Tiempo: segundos, para isométricos como la plancha.
   - Cardio: duración y distancia.
 - **Variantes**: un ejercicio puede tener una lista de variantes de fácil a difícil (por ejemplo, flexiones inclinadas → normales → arqueras). En la sesión se elige con un desplegable, que recuerda la última usada.
-- **Rutinas**: plantillas de ejercicios que se cargan de golpe en la sesión. Vienen cuatro de calistenia (Torso A/B, Pierna A/B); se pueden crear, editar, reordenar y borrar, y también guardar la sesión actual como rutina.
+- **Rutinas**: plantillas de ejercicios que se cargan de golpe en la sesión. La pestaña Hoy marca la que toca (la siguiente a la última que hiciste) y el historial muestra de qué rutina salió cada sesión. Vienen cuatro de calistenia (Torso A/B, Pierna A/B); se pueden crear, editar, reordenar y borrar, y también guardar la sesión actual como rutina.
 - **Objetivos y progresión**: cada ejercicio de una rutina puede tener un objetivo de series × rango (por ejemplo, 4 × 8-15 reps, o segundos en los isométricos). Al cargar la rutina se crean esas series y el objetivo se copia en la sesión; un ejercicio añadido a mano usa el objetivo de la última vez. Si en las dos últimas sesiones hiciste todas las series en el tope del rango con la misma variante, el ejercicio avisa de que toca subir (a la siguiente variante, o de peso en los ejercicios con peso) y ofrece un botón para cambiar de variante.
 - **Cronómetro de sesión**: se pausa solo tras 15 minutos sin actividad y se reanuda al volver a editar la sesión.
 - **Temporizador de descanso**: al marcar una serie con ✓ empieza una cuenta atrás (45–180 s, la duración elegida se recuerda), con botones de −15 s, +15 s y saltar. Al terminar suena un pitido. Mientras cuenta, la app pide al navegador que no apague la pantalla. Limitaciones de iOS: no vibra y no puede avisar con la pantalla bloqueada o con la app en segundo plano.
@@ -44,7 +44,7 @@ python -m http.server 8000
 # abrir http://localhost:8000
 ```
 
-Si abres `index.html` directamente como archivo, la app funciona, pero sin el modo sin conexión.
+La app está hecha con módulos ES, así que **no funciona abriendo `index.html` directamente como archivo** (`file://`): el navegador bloquea los módulos. Hay que servirla siempre por http(s).
 
 ## Datos
 
@@ -69,16 +69,37 @@ Al cargar o importar datos, la app los migra automáticamente: nombres de ejerci
 
 | Archivo | Descripción |
 |---|---|
-| `index.html` | Toda la app: estilos, React 18 (UMD, sin JSX ni build) y Chart.js desde cdnjs |
+| `index.html` | Página: carga React 18 y Chart.js desde cdnjs (UMD, sin JSX ni build), los estilos y `js/main.js` |
+| `css/app.css` | Estilos |
+| `js/main.js` | Arranque: monta la app y registra el service worker |
+| `js/storage.js` | Lectura y escritura en `localStorage` |
+| `js/core/` | Lógica pura, sin React ni DOM (es lo que prueban los tests) |
+| `js/core/dates.js` | Fechas locales y formatos |
+| `js/core/library.js` | Ejercicios por defecto, migraciones, modos de registro y búsqueda |
+| `js/core/sessions.js` | Qué cuenta como serie, ejercicios nuevos, totales y calorías |
+| `js/core/routines.js` | Rutinas por defecto, objetivos y rutina que toca |
+| `js/core/progression.js` | Consejo de progresión y récords personales |
+| `js/core/achievements.js` | Logros y fecha de desbloqueo |
+| `js/core/body.js` | Músculos por ejercicio y carga por zona del cuerpo |
+| `js/core/backup.js` | Validación de copias y saneado de perfil y peso |
+| `js/ui/` | Componentes de React: `app` (raíz y navegación), `workout` (Hoy), `library` (Ejercicios y rutinas), `history`, `stats`, `profile`, `backup`, `summary` (resumen de sesión), `exercise` (bloque de series y formularios) y `common` (gráficos, buscador, hooks) |
+| `tests/` | Tests de `js/core/` con el runner de Node |
+| `package.json` | Sin dependencias: solo marca los `.js` como módulos ES para Node y define `npm test` |
 | `sw.js` | Service worker: red primero para los archivos propios, caché primero para las librerías del CDN |
 | `manifest.json` | Manifiesto de la PWA |
 | `icon-180.png` | Icono de la app |
 
 ## Desarrollo
 
-No hay paso de compilación: se edita `index.html` y se recarga. Los componentes usan `React.createElement` (alias `h`) en lugar de JSX.
+No hay paso de compilación: se edita y se recarga. Los componentes usan `React.createElement` (alias `h`) en lugar de JSX. React y Chart.js son variables globales (los carga `index.html`); el resto se importa entre módulos. Lo que no depende de React ni del DOM va en `js/core/`, para poder probarlo.
 
-- Al cambiar las versiones de las librerías del CDN o la lista de archivos que se cachean, sube `CACHE` en `sw.js` (`ironlog-v1` → `ironlog-v2`). Para cambios solo en `index.html` no hace falta: se sirve primero desde la red.
+**Tests** (Node 18 o superior, sin instalar nada):
+
+```sh
+npm test
+```
+
+- **Al crear, renombrar o borrar un archivo de `js/` o `css/`, actualiza la lista `ASSETS` de `sw.js` y sube `CACHE`** (`ironlog-v2` → `ironlog-v3`). Si falta un archivo en la lista, la app no arranca sin conexión. Lo mismo al cambiar las versiones de las librerías del CDN. Para cambios dentro de archivos que ya existen no hace falta: se sirven primero desde la red.
 - Para renombrar un ejercicio por defecto, cambia su nombre en `DEFAULT_LIBRARY` y añade el nombre anterior a `LEGACY_NAMES`, así se migran los datos existentes. No cambies su `id`.
 - Los músculos que trabaja cada ejercicio por defecto están en `EXERCISE_REGIONS`.
 - El modo de registro de un ejercicio está en su campo `mode` (`weight` si falta, `bodyweight` o `time`); los de cardio usan `isCardio`. Cada ejercicio de sesión guarda su propio `mode` y su `variant`, así que el historial no cambia aunque se edite la biblioteca.

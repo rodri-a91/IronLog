@@ -1,0 +1,9 @@
+{
+  "name": "ironlog",
+  "private": true,
+  "type": "module",
+  "description": "Sin dependencias: solo indica a Node que los .js son módulos ES, para poder ejecutar los tests",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\""
+  }
+}
