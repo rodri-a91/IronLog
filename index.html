@@ -239,6 +239,25 @@ body{
   color:var(--t2);cursor:pointer;font-family:inherit;font-size:14px;flex-shrink:0;
 }
 .icon-btn:disabled{opacity:.3;cursor:default}
+/* Objetivos y consejos de progresión */
+.target-row{display:flex;align-items:center;gap:8px;margin:-4px 0 10px}
+.target-chip{font-size:13px;font-weight:600;color:var(--t1);background:var(--bg2);border:0.5px solid var(--border);border-radius:6px;padding:3px 9px;font-variant-numeric:tabular-nums}
+.hint{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:500;border-radius:8px;padding:8px 10px;margin:-2px 0 10px;border:0.5px solid transparent}
+.hint.up{background:#EAF3DE;color:#3B6D11;border-color:#97C459}
+.hint.near{background:var(--bg2);color:var(--t2)}
+@media(prefers-color-scheme:dark){.hint.up{background:#152a0a;color:#97C459;border-color:#3B6D11}}
+.routine-item-col{flex-direction:column;align-items:stretch;gap:6px}
+.routine-item-top{display:flex;align-items:center;gap:8px}
+.routine-target{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--t2)}
+.target-input{width:58px;height:32px;flex:none}
+.sc-ach.sc-rec{border-color:#378ADD;background:#E6F1FB}
+.sc-ach.sc-rec .sc-ach-title{color:#185FA5}
+.sc-ach.sc-next{border-color:#3B6D11;background:#EAF3DE}
+.sc-ach.sc-next .sc-ach-title{color:#3B6D11}
+@media(prefers-color-scheme:dark){
+  .sc-ach.sc-rec{background:#0d2a42;border-color:#185FA5}.sc-ach.sc-rec .sc-ach-title{color:#85B7EB}
+  .sc-ach.sc-next{background:#152a0a;border-color:#3B6D11}.sc-ach.sc-next .sc-ach-title{color:#97C459}
+}
 /* Fila de opción en Perfil y enlace de vuelta */
 .settings-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer;font-family:inherit;color:var(--t1)}
 .settings-row:active{background:var(--bg2)}
@@ -677,19 +696,37 @@ const MODES=['weight','bodyweight','time'];
 const MODE_LABELS={weight:'Peso',bodyweight:'Peso corporal',time:'Tiempo',cardio:'Cardio'};
 function exMode(e){return e.isCardio?'cardio':(e.mode||'weight');}
 
-// Rutinas: plantillas de ejercicios (por libraryId) que se cargan de golpe en la sesión
+// Rutinas: plantillas de ejercicios (por libraryId) que se cargan de golpe en la sesión.
+// targets: objetivo por ejercicio {sets, min, max} (repeticiones, o segundos en los de tiempo). Va en la
+// rutina y no en el ejercicio porque el mismo ejercicio puede tener objetivos distintos según el día.
+const T=(sets,min,max)=>({sets,min,max});
 const DEFAULT_ROUTINES=[
-  {id:'r-torso-a',name:'Torso A',items:['flexiones','flexiones-pica','fondos-silla','remo-mesa','plancha']},
-  {id:'r-pierna-a',name:'Pierna A',items:['sentadilla-libre','zancada-atras','puente-gluteo','gemelos','dead-bug']},
-  {id:'r-torso-b',name:'Torso B',items:['remo-toalla','flexiones-cerradas','flexiones-pica','ytw','hollow']},
-  {id:'r-pierna-b',name:'Pierna B',items:['bulgara','curl-toalla','hip-thrust-sofa','wall-sit','plancha-lateral']},
+  {id:'r-torso-a',name:'Torso A',items:['flexiones','flexiones-pica','fondos-silla','remo-mesa','plancha'],
+   targets:{'flexiones':T(4,8,15),'flexiones-pica':T(3,6,10),'fondos-silla':T(3,8,12),'remo-mesa':T(3,6,12),'plancha':T(3,30,45)}},
+  {id:'r-pierna-a',name:'Pierna A',items:['sentadilla-libre','zancada-atras','puente-gluteo','gemelos','dead-bug'],
+   targets:{'sentadilla-libre':T(4,15,20),'zancada-atras':T(3,8,12),'puente-gluteo':T(3,10,12),'gemelos':T(3,12,15),'dead-bug':T(3,6,10)}},
+  {id:'r-torso-b',name:'Torso B',items:['remo-toalla','flexiones-cerradas','flexiones-pica','ytw','hollow'],
+   targets:{'remo-toalla':T(4,8,12),'flexiones-cerradas':T(3,6,12),'flexiones-pica':T(3,6,10),'ytw':T(3,6,10),'hollow':T(3,20,30)}},
+  {id:'r-pierna-b',name:'Pierna B',items:['bulgara','curl-toalla','hip-thrust-sofa','wall-sit','plancha-lateral'],
+   targets:{'bulgara':T(3,8,12),'curl-toalla':T(3,8,12),'hip-thrust-sofa':T(3,12,20),'wall-sit':T(3,40,60),'plancha-lateral':T(3,20,30)}},
 ];
-// Descarta rutinas mal formadas (p. ej. de una copia editada a mano)
+const DEFAULT_ROUTINE_BY_ID=Object.fromEntries(DEFAULT_ROUTINES.map(r=>[r.id,r]));
+function validTarget(t){
+  return !!t&&Number.isInteger(t.sets)&&t.sets>=1&&t.sets<=20&&Number.isFinite(t.min)&&t.min>=1&&Number.isFinite(t.max)&&t.max>=t.min;
+}
+// Descarta rutinas mal formadas (p. ej. de una copia editada a mano). Las rutinas por defecto guardadas
+// antes de existir los objetivos reciben los de por defecto (sin pisar los que ya se hayan editado).
 function sanitizeRoutines(list){
   if(!Array.isArray(list))return DEFAULT_ROUTINES;
   return list.filter(r=>r&&r.id!=null&&typeof r.name==='string'&&Array.isArray(r.items))
-    .map(r=>({...r,items:r.items.filter(x=>x!=null)}));
+    .map(r=>{
+      const items=r.items.filter(x=>x!=null);
+      const src=r.targets&&typeof r.targets==='object'?r.targets:(DEFAULT_ROUTINE_BY_ID[r.id]?.targets||{});
+      const targets=Object.fromEntries(Object.entries(src).filter(([id,t])=>items.includes(id)&&validTarget(t)));
+      return {...r,items,targets};
+    });
 }
+function fmtTarget(t,mode){return t.sets+' × '+t.min+(t.max!==t.min?'-'+t.max:'')+(mode==='time'?' s':' reps');}
 
 // ---- Local Storage ----
 function loadState(key,def){try{const v=localStorage.getItem(key);return v?JSON.parse(v):def;}catch(e){return def;}}
@@ -755,14 +792,77 @@ function emptySet(mode,id=Date.now()){
   if(mode==='time')return {id,secs:''};
   return {id,reps:'',weight:''};
 }
-// variant: la última usada en ese ejercicio, si sigue existiendo; si no, la primera
-function newSessionExercise(libEx,lastVariant){
+// variant: la última usada en ese ejercicio, si sigue existiendo; si no, la primera.
+// target: el objetivo se copia en la sesión, así el historial no cambia si luego se edita la rutina;
+// con objetivo se crean ya todas sus series
+function newSessionExercise(libEx,lastVariant,target){
   const variants=libEx.isCardio?[]:(libEx.variants||[]);
   const variant=variants.includes(lastVariant)?lastVariant:variants[0];
-  return {id:Date.now()+Math.random(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
+  const t=!libEx.isCardio&&validTarget(target)?{...target}:null;
+  const base=Date.now();
+  return {id:base+Math.random(),libraryId:libEx.id,name:libEx.name,muscle:libEx.muscle,isCardio:libEx.isCardio,
     ...(!libEx.isCardio&&libEx.mode&&libEx.mode!=='weight'?{mode:libEx.mode}:{}),
     ...(variant?{variant}:{}),
-    sets:[emptySet(exMode(libEx))]};
+    ...(t?{target:t}:{}),
+    sets:Array.from({length:t?t.sets:1},(_,i)=>emptySet(exMode(libEx),base+i))};
+}
+
+// ---- Progresión y récords ----
+// Campo que mide el objetivo: segundos en los de tiempo, repeticiones en el resto
+const targetField=e=>exMode(e)==='time'?'secs':'reps';
+// Todas las series del objetivo hechas y todas en el tope del rango
+function toppedTarget(e){
+  if(!e.target)return false;
+  const f=targetField(e);
+  const done=e.sets.filter(s=>setHasData(e,s));
+  return done.length>=e.target.sets&&done.every(s=>(parseFloat(s[f])||0)>=e.target.max);
+}
+// Consejo de progresión según las dos últimas veces que se hizo el ejercicio con objetivo
+// (sessions de más reciente a más antigua). kind: 'up' toca subir, 'near' una vez en el tope.
+// fromVariant: la variante a la que se refiere (si hoy ya has cambiado de variante, no aplica).
+function progressionHint(libraryId,sessions,libById){
+  const hist=[];
+  for(const s of sessions){
+    for(const e of s.exercises)if(e.libraryId===libraryId&&e.target&&!e.isCardio){hist.push(e);break;}
+    if(hist.length===2)break;
+  }
+  const [last,prev]=hist;
+  if(!last||!toppedTarget(last))return null;
+  const fromVariant=last.variant||'';
+  if(!(prev&&(prev.variant||'')===fromVariant&&toppedTarget(prev)))
+    return {kind:'near',fromVariant,text:'La última vez llegaste al tope del rango. Si hoy también, toca subir.'};
+  const mode=exMode(last);
+  if(mode==='weight')return {kind:'up',fromVariant,text:'Dos sesiones en el tope del rango: sube el peso.'};
+  const vs=libById[libraryId]?.variants||[];
+  const i=vs.indexOf(last.variant);
+  if(i>=0&&i<vs.length-1)return {kind:'up',fromVariant,nextVariant:vs[i+1],text:'Dos sesiones en el tope del rango: pasa a «'+vs[i+1]+'».'};
+  return {kind:'up',fromVariant,text:mode==='time'
+    ?'Dos sesiones en el tope del rango: sube el tiempo del objetivo.'
+    :'Dos sesiones en el tope del rango: añade una serie o lastre.'};
+}
+// Récords de una sesión frente a las anteriores. Peso: kg máximos en una serie. Peso corporal y tiempo:
+// reps o segundos máximos en una serie dentro de la misma variante. La primera vez no cuenta como récord.
+function personalRecords(session,prevSessions){
+  const out=[];
+  session.exercises.forEach(e=>{
+    const mode=exMode(e);
+    if(mode==='cardio')return;
+    const key=exKey(e);
+    const field=mode==='weight'?'weight':targetField(e);
+    const sameVariant=x=>mode==='weight'||(x.variant||'')===(e.variant||'');
+    const best=ex=>Math.max(0,...ex.sets.filter(s=>setHasData(ex,s)).map(s=>parseFloat(s[field])||0));
+    let prevBest=0,seen=false;
+    prevSessions.forEach(s=>s.exercises.forEach(x=>{
+      if(exKey(x)!==key||exMode(x)!==mode||!sameVariant(x))return;
+      seen=true;prevBest=Math.max(prevBest,best(x));
+    }));
+    const cur=best(e);
+    if(seen&&prevBest>0&&cur>prevBest){
+      const unit=mode==='weight'?' kg':mode==='time'?' s':' reps';
+      out.push({id:e.id,name:e.name,variant:mode==='weight'?null:e.variant,value:cur+unit,before:prevBest+unit});
+    }
+  });
+  return out;
 }
 function exerciseHasData(e){return e.sets.some(s=>s.weight||s.reps||s.duration||s.distance||s.secs);}
 // Repeticiones totales en ejercicios de peso corporal (no suman al volumen en kg salvo el lastre)
@@ -979,7 +1079,8 @@ const COL_LABEL={fontSize:10,color:'var(--t2)',textTransform:'uppercase',fontWei
 const PREV_LABEL={textAlign:'center',fontSize:10,color:'var(--t2)',fontStyle:'italic',opacity:.7};
 // variants: las de la biblioteca; prevEx: el mismo ejercicio en la última sesión que se hizo
 // onSetDone: si se pasa (solo en la sesión en curso), cada serie lleva un botón ✓ que inicia el descanso
-function ExerciseBlock({ex,onChange,onRemove,bw,variants=[],prevEx=null,onSetDone}){
+// hint: consejo de progresión (solo en la sesión en curso)
+function ExerciseBlock({ex,onChange,onRemove,bw,variants=[],prevEx=null,onSetDone,hint=null}){
   const mode=exMode(ex);
   const isCardio=mode==='cardio';
   const prevSets=prevEx?.sets||[];
@@ -1096,6 +1197,15 @@ function ExerciseBlock({ex,onChange,onRemove,bw,variants=[],prevEx=null,onSetDon
       )
     ),
     prevEx?.variant&&prevEx.variant!==ex.variant&&h('div',{className:'variant-prev'},'La última vez: '+prevEx.variant),
+    ex.target&&!isCardio&&h('div',{className:'target-row'},
+      h('span',{className:'variant-label'},'Objetivo'),
+      h('span',{className:'target-chip'},fmtTarget(ex.target,mode))
+    ),
+    // El consejo se refiere a la variante de la última vez: si hoy ya has cambiado, no se muestra
+    hint&&(ex.variant||'')===hint.fromVariant&&h('div',{className:'hint '+hint.kind},
+      h('span',null,(hint.kind==='up'?'⬆ ':'')+hint.text),
+      hint.nextVariant&&variants.includes(hint.nextVariant)&&h('button',{className:'btn btns btnsm',onClick:()=>onChange({...ex,variant:hint.nextVariant})},'Cambiar')
+    ),
     body
   );
 }
@@ -1703,8 +1813,9 @@ const MUSCLE_PALETTE={
   Core:'#72243E',Glúteos:'#3B6D11',Cardio:'#185FA5'
 };
 
-// newAchievements: logros que se han desbloqueado con esta sesión
-function SessionCompleteModal({session,newAchievements=[],onClose}){
+// newAchievements: logros que se han desbloqueado con esta sesión; records: récords personales;
+// nextHints: ejercicios en los que toca subir la próxima vez
+function SessionCompleteModal({session,newAchievements=[],records=[],nextHints=[],onClose}){
   const [visible,setVisible]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setVisible(true),30);return()=>clearTimeout(t);},[]);
 
@@ -1779,6 +1890,26 @@ function SessionCompleteModal({session,newAchievements=[],onClose}){
           newAchievements.map(a=>h('div',{key:a.id,className:'sc-ach-row'},
             h('span',{className:'sc-ach-icon'},a.icon),
             h('div',null,h('div',{className:'sc-ach-name'},a.name),h('div',{className:'sc-ach-desc'},a.desc))
+          ))
+        ),
+        records.length>0&&h('div',{className:'sc-ach sc-rec'},
+          h('div',{className:'sc-ach-title'},records.length===1?'🏆 Nuevo récord':'🏆 '+records.length+' récords nuevos'),
+          records.map(r=>h('div',{key:r.id,className:'sc-ach-row'},
+            h('div',{style:{flex:1,minWidth:0}},
+              h('div',{className:'sc-ach-name'},r.name),
+              r.variant&&h('div',{className:'sc-ach-desc'},r.variant)
+            ),
+            h('div',{style:{textAlign:'right',flexShrink:0}},
+              h('div',{className:'sc-ach-name'},r.value),
+              h('div',{className:'sc-ach-desc'},'antes '+r.before)
+            )
+          ))
+        ),
+        nextHints.length>0&&h('div',{className:'sc-ach sc-next'},
+          h('div',{className:'sc-ach-title'},'⬆ La próxima vez'),
+          nextHints.map(x=>h('div',{key:x.id,className:'sc-ach-row',style:{display:'block'}},
+            h('div',{className:'sc-ach-name'},x.name),
+            h('div',{className:'sc-ach-desc'},x.text)
           ))
         ),
         h('div',{className:'sc-map-title'},'Músculos trabajados'),
@@ -1956,6 +2087,8 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
   const [completedSession,setCompletedSession]=useState(null);
   const [showRoutineName,setShowRoutineName]=useState(false);
   const [newAchievements,setNewAchievements]=useState([]);
+  const [records,setRecords]=useState([]);
+  const [nextHints,setNextHints]=useState([]);
   // Descanso en curso: {endAt, total} o null. La duración por defecto se recuerda entre sesiones
   const [rest,setRest]=useState(null);
   const [restSecs,setRestSecs]=useState(()=>{const v=loadState(REST_KEY,90);return REST_OPTIONS.includes(v)?v:90;});
@@ -2029,8 +2162,13 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
     }
   },[exercises]);
 
-  // Nuevo ejercicio de sesión con la variante de la última vez
-  const fromLibrary=libEx=>newSessionExercise(libEx,prevExMap.byKey['id:'+libEx.id]?.variant);
+  // Nuevo ejercicio de sesión con la variante de la última vez. Sin objetivo de rutina, usa el de la
+  // última sesión en que el ejercicio tenía uno
+  function lastTarget(libId){
+    for(const s of sessions)for(const e of s.exercises)if(e.libraryId===libId&&e.target)return e.target;
+    return null;
+  }
+  const fromLibrary=(libEx,target)=>newSessionExercise(libEx,prevExMap.byKey['id:'+libEx.id]?.variant,target||lastTarget(libEx.id));
   function selectFromLibrary(libEx){
     setDraftBanner(null);
     setExercises(prev=>[...prev,fromLibrary(libEx)]);
@@ -2042,14 +2180,16 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
     setDraftBanner(null);
     setExercises(prev=>{
       const have=new Set(prev.map(e=>e.libraryId));
-      const add=r.items.map(id=>libById[id]).filter(x=>x&&!have.has(x.id)).map(fromLibrary);
+      const add=r.items.map(id=>libById[id]).filter(x=>x&&!have.has(x.id)).map(x=>fromLibrary(x,r.targets?.[x.id]));
       return add.length?[...prev,...add]:prev;
     });
   }
   function saveAsRoutine(name){
     const items=[...new Set(exercises.map(e=>e.libraryId).filter(id=>id&&libById[id]))];
     if(!items.length){alert('Ningún ejercicio de la sesión está en la biblioteca.');return;}
-    onAddRoutine({id:'r-'+Date.now(),name,items});
+    // Los objetivos de la sesión pasan a la rutina
+    const targets=Object.fromEntries(exercises.filter(e=>items.includes(e.libraryId)&&validTarget(e.target)).map(e=>[e.libraryId,{...e.target}]));
+    onAddRoutine({id:'r-'+Date.now(),name,items,targets});
   }
   function saveNewToLibrary(libEx){onAddToLibrary(libEx);selectFromLibrary(libEx);}
   function discardSession(){
@@ -2081,11 +2221,16 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
     const ctx=achContext(library);
     const before=unlockedIds(sessions,ctx),after=unlockedIds([session,...sessions],ctx);
     setNewAchievements(ACHIEVEMENTS.filter(a=>after.has(a.id)&&!before.has(a.id)));
+    setRecords(personalRecords(session,sessions));
+    // Lo que toca subir la próxima vez, contando ya con esta sesión
+    const withThis=[session,...sessions];
+    setNextHints(session.exercises.map(e=>({e,hint:e.target?progressionHint(e.libraryId,withThis,libById):null}))
+      .filter(x=>x.hint?.kind==='up').map(x=>({id:x.e.id,name:x.e.name,text:x.hint.text})));
     setCompletedSession(session);
   }
   return h('div',{className:'content'},
     showNewEx&&h(NewExerciseModal,{initialName:newExName,onSave:saveNewToLibrary,onClose:()=>setShowNewEx(false)}),
-    completedSession&&h(SessionCompleteModal,{session:completedSession,newAchievements,onClose:()=>setCompletedSession(null)}),
+    completedSession&&h(SessionCompleteModal,{session:completedSession,newAchievements,records,nextHints,onClose:()=>setCompletedSession(null)}),
     showRoutineName&&h(RoutineNameModal,{onSave:saveAsRoutine,onClose:()=>setShowRoutineName(false)}),
     h('div',{className:'ptitle'},'HOY'),
     h('div',{className:'psub'},new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})),
@@ -2131,7 +2276,8 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
           // Solo pedimos confirmación si hay datos que perder
           if(exerciseHasData(e)&&!confirm('¿Eliminar "'+e.name+'" y todas sus series?'))return;
           setExercises(prev=>prev.filter((_,j)=>j!==i));
-        },bw:currentWeight,variants:libById[e.libraryId]?.variants||[],prevEx:prevExFor(e),onSetDone:startRest}))
+        },bw:currentWeight,variants:libById[e.libraryId]?.variants||[],prevEx:prevExFor(e),onSetDone:startRest,
+        hint:e.target?progressionHint(e.libraryId,sessions,libById):null}))
     ),
     h('div',{style:{display:'flex',gap:10}},
       h('button',{className:'btn btnp',style:{flex:1},onClick:save},'Guardar sesión'),
@@ -2146,16 +2292,29 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
 
 // ---- Library Tab ----
 // Editor de una rutina: nombre y ejercicios (ordenar, quitar, añadir)
+// Objetivo editable como texto (los campos vacíos = sin objetivo)
+const targetToForm=t=>t?{sets:String(t.sets),min:String(t.min),max:String(t.max)}:{sets:'',min:'',max:''};
 function RoutineEditModal({routine,library,onSave,onDelete,onClose}){
   const [name,setName]=useState(routine.name);
   const [items,setItems]=useState(routine.items);
+  const [targets,setTargets]=useState(()=>Object.fromEntries(routine.items.map(id=>[id,targetToForm(routine.targets?.[id])])));
+  const setT=(id,f,v)=>setTargets(prev=>({...prev,[id]:{...(prev[id]||targetToForm()),[f]:v}}));
   const [askDelete,setAskDelete]=useState(false);
   const libById=useMemo(()=>Object.fromEntries(library.map(e=>[e.id,e])),[library]);
   function move(i,d){const n=[...items];[n[i],n[i+d]]=[n[i+d],n[i]];setItems(n);}
   function save(){
     if(!name.trim()){alert('Escribe un nombre');return;}
     // Los ejercicios borrados de la biblioteca se quitan al guardar
-    onSave({...routine,name:name.trim(),items:items.filter(id=>libById[id])});
+    const kept=items.filter(id=>libById[id]);
+    const out={};
+    for(const id of kept){
+      const f=targets[id]||targetToForm();
+      if(!f.sets&&!f.min&&!f.max)continue; // sin objetivo
+      const t={sets:parseInt(f.sets),min:parseFloat(f.min),max:parseFloat(f.max||f.min)};
+      if(!validTarget(t)){alert('Revisa el objetivo de "'+libById[id].name+'": series (1-20), mínimo y máximo, con el máximo mayor o igual que el mínimo.');return;}
+      out[id]=t;
+    }
+    onSave({...routine,name:name.trim(),items:kept,targets:out});
     onClose();
   }
   // Sin cierre al tocar el fondo: se perderían los cambios por accidente
@@ -2166,12 +2325,25 @@ function RoutineEditModal({routine,library,onSave,onDelete,onClose}){
       h('div',{className:'fg'},h('label',null,'Nombre'),h('input',{value:name,onChange:e=>setName(e.target.value),placeholder:'Ej: Torso A'})),
       h('div',{className:'fg',style:{marginBottom:4}},h('label',null,'Ejercicios ('+items.length+')')),
       items.length===0&&h('div',{style:{fontSize:13,color:'var(--t2)',padding:'8px 0'}},'Todavía no hay ejercicios.'),
-      items.map((id,i)=>h('div',{key:id,className:'routine-item'},
-        h('span',{className:'routine-item-name'},libById[id]?.name||h('em',{style:{color:'var(--t2)'}},'(ejercicio eliminado)')),
-        h('button',{className:'icon-btn',disabled:i===0,onClick:()=>move(i,-1),'aria-label':'Subir'},'↑'),
-        h('button',{className:'icon-btn',disabled:i===items.length-1,onClick:()=>move(i,1),'aria-label':'Bajar'},'↓'),
-        h('button',{className:'icon-btn',onClick:()=>setItems(items.filter((_,j)=>j!==i)),'aria-label':'Quitar'},'×')
-      )),
+      items.map((id,i)=>{
+        const lib=libById[id];
+        const f=targets[id]||targetToForm();
+        const unit=lib&&exMode(lib)==='time'?'s':'reps';
+        const num=(field,label)=>h('input',{className:'series-input target-input',type:'number',inputMode:'numeric',min:1,
+          value:f[field],placeholder:label,'aria-label':label+' de '+(lib?.name||''),onChange:e=>setT(id,field,e.target.value)});
+        return h('div',{key:id,className:'routine-item routine-item-col'},
+          h('div',{className:'routine-item-top'},
+            h('span',{className:'routine-item-name'},lib?.name||h('em',{style:{color:'var(--t2)'}},'(ejercicio eliminado)')),
+            h('button',{className:'icon-btn',disabled:i===0,onClick:()=>move(i,-1),'aria-label':'Subir'},'↑'),
+            h('button',{className:'icon-btn',disabled:i===items.length-1,onClick:()=>move(i,1),'aria-label':'Bajar'},'↓'),
+            h('button',{className:'icon-btn',onClick:()=>setItems(items.filter((_,j)=>j!==i)),'aria-label':'Quitar'},'×')
+          ),
+          lib&&!lib.isCardio&&h('div',{className:'routine-target'},
+            h('span',null,'Objetivo'),
+            num('sets','series'),h('span',null,'×'),num('min','mín'),h('span',null,'-'),num('max','máx'),h('span',null,unit)
+          )
+        );
+      }),
       h('div',{style:{margin:'12px 0'}},
         h(ExercisePicker,{library,onSelect:ex=>{if(!items.includes(ex.id))setItems([...items,ex.id]);}})
       ),

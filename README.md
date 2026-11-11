@@ -12,13 +12,14 @@ Registro de entrenamientos de gimnasio y calistenia pensado para el móvil. Es u
   - Cardio: duración y distancia.
 - **Variantes**: un ejercicio puede tener una lista de variantes de fácil a difícil (por ejemplo, flexiones inclinadas → normales → arqueras). En la sesión se elige con un desplegable, que recuerda la última usada.
 - **Rutinas**: plantillas de ejercicios que se cargan de golpe en la sesión. Vienen cuatro de calistenia (Torso A/B, Pierna A/B); se pueden crear, editar, reordenar y borrar, y también guardar la sesión actual como rutina.
+- **Objetivos y progresión**: cada ejercicio de una rutina puede tener un objetivo de series × rango (por ejemplo, 4 × 8-15 reps, o segundos en los isométricos). Al cargar la rutina se crean esas series y el objetivo se copia en la sesión; un ejercicio añadido a mano usa el objetivo de la última vez. Si en las dos últimas sesiones hiciste todas las series en el tope del rango con la misma variante, el ejercicio avisa de que toca subir (a la siguiente variante, o de peso en los ejercicios con peso) y ofrece un botón para cambiar de variante.
 - **Cronómetro de sesión**: se pausa solo tras 15 minutos sin actividad y se reanuda al volver a editar la sesión.
 - **Temporizador de descanso**: al marcar una serie con ✓ empieza una cuenta atrás (45–180 s, la duración elegida se recuerda), con botones de −15 s, +15 s y saltar. Al terminar suena un pitido. Mientras cuenta, la app pide al navegador que no apague la pantalla. Limitaciones de iOS: no vibra y no puede avisar con la pantalla bloqueada o con la app en segundo plano.
 - **Borrador automático**: la sesión en curso se guarda mientras entrenas y se recupera si cierras la app.
 - **Calorías estimadas**:
   - Fuerza: MET por grupo muscular, ajustado por repeticiones y carga (en los isométricos, por el tiempo aguantado).
   - Cardio: MET por actividad; en carrera con distancia se usa la ecuación del ACSM según la velocidad.
-- **Resumen al terminar**: mapa muscular frontal y posterior. Cada ejercicio marca sus músculos principales y secundarios con una escala de series (1–2, 3–4, 5–7, 8+).
+- **Resumen al terminar**: logros desbloqueados, récords personales (kg máximos en una serie, o reps y segundos máximos en una serie dentro de la misma variante; la primera vez no cuenta), qué toca subir la próxima vez y mapa muscular frontal y posterior. Cada ejercicio marca sus músculos principales y secundarios con una escala de series (1–2, 3–4, 5–7, 8+).
 - **Historial**: detalle de cada sesión, que se puede editar o eliminar.
 - **Estadísticas**:
   - Volumen y calorías por semana, mes (4 semanas) o año (12 meses). El volumen en kg solo cuenta pesos reales y lastre; las repeticiones de peso corporal tienen su propia métrica.
@@ -81,4 +82,5 @@ No hay paso de compilación: se edita `index.html` y se recarga. Los componentes
 - Para renombrar un ejercicio por defecto, cambia su nombre en `DEFAULT_LIBRARY` y añade el nombre anterior a `LEGACY_NAMES`, así se migran los datos existentes. No cambies su `id`.
 - Los músculos que trabaja cada ejercicio por defecto están en `EXERCISE_REGIONS`.
 - El modo de registro de un ejercicio está en su campo `mode` (`weight` si falta, `bodyweight` o `time`); los de cardio usan `isCardio`. Cada ejercicio de sesión guarda su propio `mode` y su `variant`, así que el historial no cambia aunque se edite la biblioteca.
-- Las rutinas por defecto están en `DEFAULT_ROUTINES` y solo se cargan si no existe la clave `il_routines`.
+- Las rutinas por defecto están en `DEFAULT_ROUTINES` y solo se cargan si no existe la clave `il_routines`. Sus objetivos están en `targets` (por libraryId); las rutinas por defecto guardadas antes de existir los objetivos los reciben al cargar.
+- Cada ejercicio de sesión guarda una copia de su objetivo (`target`), igual que `mode` y `variant`: el consejo de progresión se calcula con el objetivo que había ese día, no con el actual de la rutina.
