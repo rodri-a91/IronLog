@@ -60,7 +60,7 @@ Todo se guarda en el `localStorage` del navegador, en estas claves:
 | `il_draft` | Sesión en curso |
 | `il_lastBackup` | Fecha de la última exportación |
 
-No hay sincronización entre dispositivos. Para pasar los datos a otro móvil, exporta la copia en *Backup* e impórtala en el otro.
+No hay sincronización entre dispositivos. Para pasar los datos a otro móvil, exporta la copia en *Perfil → Copia de seguridad* e impórtala en el otro.
 
 Al cargar o importar datos, la app los migra automáticamente: nombres de ejercicios antiguos, sesiones sin `libraryId`, ejercicios por defecto añadidos en versiones nuevas, modo y variantes de los ejercicios por defecto guardados antes de existir y fechas de peso inválidas. Las copias anteriores a las rutinas se importan conservando las rutinas actuales.
 

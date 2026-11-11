@@ -239,6 +239,14 @@ body{
   color:var(--t2);cursor:pointer;font-family:inherit;font-size:14px;flex-shrink:0;
 }
 .icon-btn:disabled{opacity:.3;cursor:default}
+/* Fila de opción en Perfil y enlace de vuelta */
+.settings-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer;font-family:inherit;color:var(--t1)}
+.settings-row:active{background:var(--bg2)}
+.settings-row-icon{font-size:22px;flex-shrink:0}
+.settings-row-title{display:block;font-size:15px;font-weight:600}
+.settings-row-sub{display:block;font-size:12px;color:var(--t2);margin-top:2px}
+.settings-row-chevron{font-size:22px;color:var(--t2);flex-shrink:0;line-height:1}
+.back-link{background:none;border:none;padding:0;margin-bottom:8px;color:var(--accent2);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
 .series-input{
   height:36px;border:0.5px solid var(--border2);border-radius:8px;
   padding:0 8px;font-size:16px;background:var(--bg2);color:var(--t1);
@@ -683,7 +691,7 @@ function saveState(key,val){
   catch(e){
     if(!storageWarned){
       storageWarned=true;
-      alert('⚠ No se han podido guardar los datos (almacenamiento lleno o bloqueado). Exporta una copia de seguridad desde la pestaña Backup cuanto antes.');
+      alert('⚠ No se han podido guardar los datos (almacenamiento lleno o bloqueado). Exporta una copia de seguridad desde Perfil → Copia de seguridad cuanto antes.');
     }
   }
 }
@@ -1259,7 +1267,7 @@ function getInitials(name){
 }
 
 // ---- Profile Tab ----
-function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessions}){
+function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessions,backupAgeDays,needsBackup,onOpenBackup}){
   const [editing,setEditing]=useState(false);
   const [draft,setDraft]=useState(profile);
   const [newWeight,setNewWeight]=useState('');
@@ -1372,6 +1380,19 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
 
     sortedLog.length===0&&h('div',{className:'card'},
       h('div',{className:'empty'},h('div',{className:'empty-icon'},'⚖️'),h('div',null,'Añade tu primer registro de peso'))
+    ),
+
+    // Copia de seguridad (antes era una pestaña del menú)
+    h('button',{className:'card settings-row',onClick:onOpenBackup},
+      h('span',{className:'settings-row-icon'},'💾'),
+      h('span',{style:{flex:1,minWidth:0}},
+        h('span',{className:'settings-row-title'},'Copia de seguridad'),
+        h('span',{className:'settings-row-sub',style:needsBackup?{color:'var(--accent)'}:{}},
+          backupAgeDays===null?'Aún no has hecho ninguna copia'
+          :backupAgeDays===0?'Última copia: hoy'
+          :'Última copia hace '+backupAgeDays+(backupAgeDays===1?' día':' días'))
+      ),
+      h('span',{className:'settings-row-chevron','aria-hidden':'true'},'›')
     ),
 
     // Achievements
@@ -2584,7 +2605,7 @@ function validateBackup(data){
   if(data.profile!=null&&typeof data.profile!=='object')fail('el perfil no es válido.');
   if(data.routines!=null&&!Array.isArray(data.routines))fail('las rutinas no son una lista.');
 }
-function BackupTab({sessions,library,profile,weightLog,routines,onRestore,onExported}){
+function BackupTab({sessions,library,profile,weightLog,routines,onRestore,onExported,onBack}){
   const [importError,setImportError]=useState('');
   const [importOk,setImportOk]=useState(false);
   const fileRef=useRef();
@@ -2624,6 +2645,7 @@ function BackupTab({sessions,library,profile,weightLog,routines,onRestore,onExpo
   }
 
   return h('div',{className:'content'},
+    h('button',{className:'back-link',onClick:onBack},'‹ Perfil'),
     h('div',{className:'ptitle'},'COPIA DE SEGURIDAD'),
     h('div',{className:'psub'},'Exporta e importa todos tus datos'),
 
@@ -2730,8 +2752,9 @@ function App(){
     {id:'history', label:'Historial', Icon:Icons.history},
     {id:'stats',   label:'Stats',     Icon:Icons.stats},
     {id:'profile', label:'Perfil',    Icon:()=>h('svg',{viewBox:'0 0 24 24'},h('circle',{cx:12,cy:8,r:4}),h('path',{d:'M4 20c0-4 3.6-7 8-7s8 3 8 7'}))},
-    {id:'backup',  label:'Backup',    Icon:()=>h('svg',{viewBox:'0 0 24 24'},h('path',{d:'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4'}),h('polyline',{points:'7 10 12 15 17 10'}),h('line',{x1:'12',y1:'15',x2:'12',y2:'3'}))},
   ];
+  // La copia de seguridad no está en el menú: se abre desde Perfil, que sigue marcado mientras tanto
+  const navActive=id=>tab===id||(id==='profile'&&tab==='backup');
 
   return h('div',{className:'app'},
     h('div',{className:'topbar'},
@@ -2750,7 +2773,7 @@ function App(){
     ),
     h('div',{className:'nav'},
       TABS.map(t=>h('div',{key:t.id,className:'navbtn-wrap'},
-        h('button',{className:'navbtn'+(tab===t.id?' active':''),onClick:()=>setTab(t.id),style:{width:'100%'}},
+        h('button',{className:'navbtn'+(navActive(t.id)?' active':''),onClick:()=>setTab(t.id),style:{width:'100%'}},
           h(t.Icon),h('span',null,t.label)
         ),
         t.id==='workout'&&hasActiveSession&&tab!=='workout'&&h('div',{className:'navbtn-dot'})
@@ -2773,9 +2796,11 @@ function App(){
     h('div',{style:{display:tab==='stats'?'block':'none'}},
       h(StatsTab,{sessions,library,day})),
     h('div',{style:{display:tab==='profile'?'block':'none'}},
-      h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions})),
+      h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions,
+        backupAgeDays,needsBackup,onOpenBackup:()=>{setTab('backup');window.scrollTo(0,0);}})),
     h('div',{style:{display:tab==='backup'?'block':'none'}},
-      h(BackupTab,{sessions,library,profile,weightLog,routines,onRestore:restoreBackup,onExported:markExported}))
+      h(BackupTab,{sessions,library,profile,weightLog,routines,onRestore:restoreBackup,onExported:markExported,
+        onBack:()=>{setTab('profile');window.scrollTo(0,0);}}))
   );
 }
 
