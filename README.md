@@ -25,7 +25,7 @@ Registro de entrenamientos de gimnasio y calistenia pensado para el móvil. Es u
   - Calendario de días entrenados.
   - Progresión por ejercicio: peso máximo, repeticiones máximas en una serie o segundos máximos, según el modo.
 - **Biblioteca de ejercicios**: 47 ejercicios por defecto (29 de gimnasio y cardio, 18 de calistenia) más los que crees tú. Se pueden renombrar sin perder el historial, porque las sesiones se vinculan por id. El modo de registro no se puede cambiar si el ejercicio ya tiene sesiones.
-- **Perfil**: registro de peso corporal con gráfico (se usa para estimar calorías) y 23 logros.
+- **Perfil**: registro de peso corporal con gráfico (se usa para estimar calorías), acceso a la copia de seguridad y 36 logros en cinco categorías (constancia, fuerza, calistenia, quema y variedad). Cada logro conseguido muestra la fecha de la sesión con la que se consiguió, y el resumen de la sesión avisa de los logros nuevos. Los logros se calculan a partir del historial: si se borra una sesión, el logro puede volver a bloquearse.
 - **Copia de seguridad**: exporta e importa todos los datos en JSON. La app avisa si llevas más de 7 días sin hacer copia.
 - **Funciona sin conexión** una vez cargada, y se puede instalar en la pantalla de inicio.
 - **Modo claro y oscuro** según el sistema.
@@ -53,7 +53,7 @@ Todo se guarda en el `localStorage` del navegador, en estas claves:
 |---|---|
 | `il_sessions` | Sesiones guardadas (la más reciente primero) |
 | `il_library` | Biblioteca de ejercicios |
-| `il_profile` | Nombre, sexo y fecha de nacimiento |
+| `il_profile` | Nombre (el sexo y la fecha de nacimiento de versiones anteriores se descartan al cargar) |
 | `il_weightlog` | Registro de peso corporal |
 | `il_routines` | Rutinas |
 | `il_restSecs` | Duración del descanso por defecto (segundos) |

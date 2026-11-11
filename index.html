@@ -405,6 +405,14 @@ body{
 .ach-prog-wrap{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:2px}
 .ach-prog{height:100%;border-radius:2px;transition:width .6s .2s cubic-bezier(.2,.8,.4,1)}
 .ach-prog-label{font-size:10px;color:var(--t2);margin-top:2px}
+.ach-date{font-size:10px;color:var(--t2);margin-top:2px}
+.sc-ach{border:0.5px solid #BA7517;background:#FAEEDA;border-radius:12px;padding:12px 14px;margin-bottom:18px}
+.sc-ach-title{font-size:12px;font-weight:700;color:#854F0B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.sc-ach-row{display:flex;align-items:center;gap:10px;padding:4px 0}
+.sc-ach-icon{font-size:24px;line-height:1}
+.sc-ach-name{font-size:14px;font-weight:700;color:var(--t1)}
+.sc-ach-desc{font-size:12px;color:var(--t2)}
+@media(prefers-color-scheme:dark){.sc-ach{background:#2e1d04;border-color:#854F0B}.sc-ach-title{color:#EF9F27}}
 .ach-cat-label{font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px}
 .ach-summary{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border-radius:10px;margin-bottom:12px}
 .ach-summary-num{font-size:28px;font-weight:800;color:var(--accent)}
@@ -738,7 +746,9 @@ function setHasData(e,s){
   if(mode==='time')return parseFloat(s.secs)>0;
   // En peso corporal el lastre solo no es una serie: hacen falta repeticiones
   if(mode==='bodyweight')return parseInt(s.reps)>0;
-  return parseFloat(s.weight)>0||parseInt(s.reps)>0;
+  // Peso: hacen falta repeticiones (con 0 kg vale, p. ej. dominadas sin lastre). Una serie solo con kg
+  // no es una serie: es fácil dejar las reps vacías creyendo que el valor gris de la vez anterior cuenta
+  return parseInt(s.reps)>0;
 }
 function emptySet(mode,id=Date.now()){
   if(mode==='cardio')return {id,duration:'',distance:''};
@@ -1091,7 +1101,10 @@ function ExerciseBlock({ex,onChange,onRemove,bw,variants=[],prevEx=null,onSetDon
 }
 
 // ---- Achievements engine ----
-// Racha más larga de días consecutivos en todo el historial (los logros, una vez conseguidos, no se pierden)
+// Los logros no se guardan: se calculan a partir del historial. Si se borra o edita una sesión, un logro
+// puede volver a bloquearse. Cada check recibe las sesiones (en cualquier orden) y un contexto {libById}.
+
+// Racha más larga de días consecutivos en todo el historial
 function calcStreak(sessions){
   if(!sessions.length)return 0;
   const days=[...new Set(sessions.map(s=>new Date(s.date).toDateString()))].map(d=>new Date(d)).sort((a,b)=>b-a);
@@ -1101,6 +1114,25 @@ function calcStreak(sessions){
     const diff=Math.round((days[i-1]-days[i])/864e5);
     if(diff===1){streak++;max=Math.max(max,streak);}else streak=1;
   }
+  return max;
+}
+// Lunes (fecha local "YYYY-MM-DD") de la semana de una fecha
+function weekKey(date){
+  const d=new Date(date);
+  return localISODate(new Date(d.getFullYear(),d.getMonth(),d.getDate()-((d.getDay()+6)%7)));
+}
+// Racha más larga de semanas seguidas con al menos minDays días entrenados. Premia la constancia
+// sin castigar los días de descanso (las rachas de días consecutivos sí lo hacen)
+function calcWeekStreak(sessions,minDays=3){
+  const days={};
+  sessions.forEach(s=>{const k=weekKey(s.date);(days[k]=days[k]||new Set()).add(localISODate(new Date(s.date)));});
+  const weeks=Object.keys(days).filter(k=>days[k].size>=minDays).sort();
+  let streak=0,max=0,prev=null;
+  weeks.forEach(k=>{
+    const t=parseLocalDate(k);
+    streak=prev&&Math.round((t-prev)/864e5)===7?streak+1:1;
+    max=Math.max(max,streak);prev=t;
+  });
   return max;
 }
 // Peso máximo en un ejercicio de la biblioteca por defecto. Se compara por libraryId (no por subcadena del nombre,
@@ -1113,7 +1145,17 @@ function maxWeightForExercise(sessions,libId){
   }));
   return max;
 }
-function totalVolume(sessions){return sessions.reduce((t,s)=>t+s.totalVolume,0);}
+// Máximo de un campo (reps, secs...) en una serie de un ejercicio
+function maxSetValue(sessions,libId,field){
+  let max=0;
+  sessions.forEach(s=>s.exercises.forEach(e=>{
+    if(e.libraryId!==libId)return;
+    e.sets.forEach(set=>{const v=parseFloat(set[field])||0;if(v>max)max=v;});
+  }));
+  return max;
+}
+// ||0: sesiones de copias antiguas o editadas a mano pueden no traer los totales
+function totalVolume(sessions){return sessions.reduce((t,s)=>t+(s.totalVolume||0),0);}
 function totalSessions(sessions){return sessions.length;}
 function totalCalories(sessions){return sessions.reduce((t,s)=>t+(s.calories||0),0);}
 function totalCardioMin(sessions){return sessions.reduce((t,s)=>t+(s.totalCardioMin||0),0);}
@@ -1128,7 +1170,7 @@ function uniqueExerciseCount(sessions){
   return names.size;
 }
 function maxSingleSessionVolume(sessions){
-  return sessions.reduce((m,s)=>Math.max(m,s.totalVolume),0);
+  return sessions.reduce((m,s)=>Math.max(m,s.totalVolume||0),0);
 }
 function maxSingleSessionCal(sessions){
   return sessions.reduce((m,s)=>Math.max(m,s.calories||0),0);
@@ -1136,6 +1178,32 @@ function maxSingleSessionCal(sessions){
 function daysActive(sessions){
   return new Set(sessions.map(s=>new Date(s.date).toDateString())).size;
 }
+function maxSessionBwReps(sessions){return sessions.reduce((m,s)=>Math.max(m,bodyweightReps(s.exercises)),0);}
+function totalBwReps(sessions){return sessions.reduce((t,s)=>t+bodyweightReps(s.exercises),0);}
+// La fecha de la sesión es la hora en que se guardó (al terminar)
+function anySessionHour(sessions,test){return sessions.some(s=>test(new Date(s.date).getHours()));}
+function legSessions(sessions){
+  return sessions.filter(s=>s.exercises.some(e=>!e.isCardio&&(e.muscle==='Piernas'||e.muscle==='Glúteos'))).length;
+}
+// Progreso en variantes: para cada ejercicio con variantes, la posición de la primera que usaste
+// y la más difícil a la que has llegado (según el orden actual de la biblioteca)
+function variantLevels(sessions,ctx){
+  const asc=[...sessions].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const lv={};
+  asc.forEach(s=>s.exercises.forEach(e=>{
+    const vs=ctx.libById[e.libraryId]?.variants;
+    if(!e.variant||!vs||vs.length<2)return;
+    const i=vs.indexOf(e.variant);
+    if(i<0)return;
+    if(!lv[e.libraryId])lv[e.libraryId]={first:i,max:i,last:vs.length-1};
+    lv[e.libraryId].max=Math.max(lv[e.libraryId].max,i);
+  }));
+  return Object.values(lv);
+}
+const levelUp=(s,ctx)=>variantLevels(s,ctx).some(l=>l.max>l.first);
+const mastery=(s,ctx)=>variantLevels(s,ctx).some(l=>l.max===l.last);
+// Logros de sí/no: progreso 0 o 1
+const flag=fn=>(s,ctx)=>({v:fn(s,ctx)?1:0,t:1});
 
 const ACHIEVEMENTS=[
   // --- Constancia ---
@@ -1149,12 +1217,22 @@ const ACHIEVEMENTS=[
    check:s=>totalSessions(s)>=50,prog:s=>({v:Math.min(totalSessions(s),50),t:50})},
   {id:'s100',cat:'Constancia',icon:'👑',name:'Centenario',desc:'100 sesiones completadas',color:'#BA7517',
    check:s=>totalSessions(s)>=100,prog:s=>({v:Math.min(totalSessions(s),100),t:100})},
+  {id:'weeks4',cat:'Constancia',icon:'📅',name:'Mes sin fallar',desc:'4 semanas seguidas entrenando al menos 3 días',color:'#378ADD',
+   check:s=>calcWeekStreak(s)>=4,prog:s=>({v:Math.min(calcWeekStreak(s),4),t:4})},
+  {id:'weeks12',cat:'Constancia',icon:'🧱',name:'Disciplina de hierro',desc:'12 semanas seguidas entrenando al menos 3 días',color:'#BA7517',
+   check:s=>calcWeekStreak(s)>=12,prog:s=>({v:Math.min(calcWeekStreak(s),12),t:12})},
   {id:'streak3',cat:'Constancia',icon:'📆',name:'3 días seguidos',desc:'Entrena 3 días consecutivos',color:'#E24B4A',
    check:s=>calcStreak(s)>=3,prog:s=>({v:Math.min(calcStreak(s),3),t:3})},
-  {id:'streak7',cat:'Constancia',icon:'🗓️',name:'Semana perfecta',desc:'7 días de entrenamiento consecutivos',color:'#E24B4A',
+  {id:'streak7',cat:'Constancia',icon:'🗓️',name:'Siete de siete',desc:'7 días de entrenamiento consecutivos',color:'#E24B4A',
    check:s=>calcStreak(s)>=7,prog:s=>({v:Math.min(calcStreak(s),7),t:7})},
   {id:'days30',cat:'Constancia',icon:'🌟',name:'30 días activo',desc:'Entrena en 30 días distintos',color:'#BA7517',
    check:s=>daysActive(s)>=30,prog:s=>({v:Math.min(daysActive(s),30),t:30})},
+  {id:'days100',cat:'Constancia',icon:'💯',name:'100 días activo',desc:'Entrena en 100 días distintos',color:'#BA7517',
+   check:s=>daysActive(s)>=100,prog:s=>({v:Math.min(daysActive(s),100),t:100})},
+  {id:'early',cat:'Constancia',icon:'🌅',name:'Madrugador',desc:'Termina una sesión antes de las 8:00',color:'#BA7517',
+   check:s=>anySessionHour(s,h=>h>=4&&h<8),prog:flag(s=>anySessionHour(s,h=>h>=4&&h<8))},
+  {id:'night',cat:'Constancia',icon:'🦉',name:'Búho',desc:'Termina una sesión entre las 22:00 y las 4:00',color:'#72243E',
+   check:s=>anySessionHour(s,h=>h>=22||h<4),prog:flag(s=>anySessionHour(s,h=>h>=22||h<4))},
 
   // --- Fuerza ---
   {id:'vol1t',cat:'Fuerza',icon:'🏋️',name:'Primera tonelada',desc:'1.000 kg de volumen en una sesión',color:'#3B6D11',
@@ -1176,6 +1254,22 @@ const ACHIEVEMENTS=[
    check:s=>maxWeightForExercise(s,'prensa')>=60,
    prog:s=>({v:Math.min(Math.round(maxWeightForExercise(s,'prensa')),60),t:60})},
 
+  // --- Calistenia ---
+  {id:'bw100',cat:'Calistenia',icon:'🤸',name:'Centena',desc:'100 repeticiones de peso corporal en una sesión',color:'#185FA5',
+   check:s=>maxSessionBwReps(s)>=100,prog:s=>({v:Math.min(maxSessionBwReps(s),100),t:100})},
+  {id:'bw5000',cat:'Calistenia',icon:'🔁',name:'5.000 repeticiones',desc:'5.000 repeticiones de peso corporal acumuladas',color:'#185FA5',
+   check:s=>totalBwReps(s)>=5000,prog:s=>({v:Math.min(totalBwReps(s),5000),t:5000})},
+  {id:'push20',cat:'Calistenia',icon:'🙌',name:'Veinte seguidas',desc:'20 flexiones en una serie (cualquier variante)',color:'#E24B4A',
+   check:s=>maxSetValue(s,'flexiones','reps')>=20,prog:s=>({v:Math.min(maxSetValue(s,'flexiones','reps'),20),t:20})},
+  {id:'plank60',cat:'Calistenia',icon:'⏱️',name:'Minuto de acero',desc:'60 s de plancha en una serie',color:'#72243E',
+   check:s=>maxSetValue(s,'plancha','secs')>=60,prog:s=>({v:Math.min(maxSetValue(s,'plancha','secs'),60),t:60})},
+  {id:'plank120',cat:'Calistenia',icon:'🪨',name:'Roca',desc:'2 minutos de plancha en una serie',color:'#72243E',
+   check:s=>maxSetValue(s,'plancha','secs')>=120,prog:s=>({v:Math.min(maxSetValue(s,'plancha','secs'),120),t:120})},
+  {id:'levelup',cat:'Calistenia',icon:'📈',name:'Subes de nivel',desc:'Pasa a una variante más difícil en cualquier ejercicio',color:'#3B6D11',
+   check:levelUp,prog:flag(levelUp)},
+  {id:'mastery',cat:'Calistenia',icon:'🥋',name:'Maestría',desc:'Llega a la última variante de un ejercicio',color:'#BA7517',
+   check:mastery,prog:flag(mastery)},
+
   // --- Quema ---
   {id:'cal500',cat:'Quema',icon:'🔆',name:'Horno',desc:'500 kcal en una sola sesión',color:'#BA7517',
    check:s=>maxSingleSessionCal(s)>=500,prog:s=>({v:Math.min(maxSingleSessionCal(s),500),t:500})},
@@ -1184,7 +1278,7 @@ const ACHIEVEMENTS=[
   {id:'totalcal10k',cat:'Quema',icon:'🌋',name:'10.000 kcal',desc:'10.000 kcal quemadas en total',color:'#BA7517',
    check:s=>totalCalories(s)>=10000,prog:s=>({v:Math.min(totalCalories(s),10000),t:10000})},
   {id:'cardio60',cat:'Quema',icon:'🏃',name:'Maratoniano',desc:'60 minutos de cardio en una sesión',color:'#185FA5',
-   check:s=>s.some(x=>(x.totalCardioMin||0)>=60),prog:s=>({v:Math.min(Math.max(0,...s.map(x=>x.totalCardioMin||0)),60),t:60})},
+   check:s=>s.some(x=>(x.totalCardioMin||0)>=60),prog:s=>({v:Math.min(s.reduce((m,x)=>Math.max(m,x.totalCardioMin||0),0),60),t:60})},
 
   // --- Variedad ---
   {id:'muscles5',cat:'Variedad',icon:'🧩',name:'Completo',desc:'Trabaja 5 grupos musculares distintos',color:'#72243E',
@@ -1195,11 +1289,30 @@ const ACHIEVEMENTS=[
    check:s=>uniqueExerciseCount(s)>=10,prog:s=>({v:Math.min(uniqueExerciseCount(s),10),t:10})},
   {id:'exercises20',cat:'Variedad',icon:'🎨',name:'Enciclopedia',desc:'Prueba 20 ejercicios diferentes',color:'#72243E',
    check:s=>uniqueExerciseCount(s)>=20,prog:s=>({v:Math.min(uniqueExerciseCount(s),20),t:20})},
+  {id:'legday10',cat:'Variedad',icon:'🍗',name:'Nunca me salto pierna',desc:'10 sesiones con ejercicios de pierna o glúteo',color:'#3B6D11',
+   check:s=>legSessions(s)>=10,prog:s=>({v:Math.min(legSessions(s),10),t:10})},
 ];
 
-function AchievementsSection({sessions}){
-  // Cada logro recorre todo el historial: recalcular solo cuando cambian las sesiones
-  const evaluated=useMemo(()=>ACHIEVEMENTS.map(a=>({...a,unlocked:a.check(sessions),progress:a.prog(sessions)})),[sessions]);
+function achContext(library){return {libById:Object.fromEntries(library.map(e=>[e.id,e]))};}
+function unlockedIds(sessions,ctx){return new Set(ACHIEVEMENTS.filter(a=>a.check(sessions,ctx)).map(a=>a.id));}
+// Fecha de la sesión con la que se consiguió un logro. Todos los logros son monótonos (una sesión más nunca
+// los bloquea), así que basta una búsqueda binaria sobre el historial en orden cronológico.
+function unlockDate(a,asc,ctx){
+  let lo=1,hi=asc.length;
+  while(lo<hi){const mid=(lo+hi)>>1;if(a.check(asc.slice(0,mid),ctx))hi=mid;else lo=mid+1;}
+  return asc[lo-1]?.date||null;
+}
+
+function AchievementsSection({sessions,library}){
+  // Cada logro recorre todo el historial: recalcular solo cuando cambian las sesiones o la biblioteca
+  const evaluated=useMemo(()=>{
+    const ctx=achContext(library);
+    const asc=[...sessions].sort((a,b)=>new Date(a.date)-new Date(b.date));
+    return ACHIEVEMENTS.map(a=>{
+      const unlocked=a.check(sessions,ctx);
+      return {...a,unlocked,progress:a.prog(sessions,ctx),date:unlocked?unlockDate(a,asc,ctx):null};
+    });
+  },[sessions,library]);
   const unlocked=evaluated.filter(a=>a.unlocked).length;
   const cats=[...new Set(ACHIEVEMENTS.map(a=>a.cat))];
 
@@ -1213,8 +1326,9 @@ function AchievementsSection({sessions}){
     ),
     cats.map(cat=>{
       const catAchs=evaluated.filter(a=>a.cat===cat);
+      const catDone=catAchs.filter(a=>a.unlocked).length;
       return h('div',{key:cat},
-        h('div',{className:'ach-cat-label'},cat),
+        h('div',{className:'ach-cat-label'},cat+' · '+catDone+'/'+catAchs.length),
         h('div',{className:'ach-grid'},
           catAchs.map(a=>{
             const pct=a.progress.t>0?Math.round((a.progress.v/a.progress.t)*100):0;
@@ -1223,12 +1337,15 @@ function AchievementsSection({sessions}){
               h('span',{className:'ach-icon'},a.icon),
               h('div',{className:'ach-name'},a.name),
               h('div',{className:'ach-desc'},a.desc),
-              !a.unlocked&&a.progress.t>0&&h('div',null,
+              // Los de sí/no (t=1) no llevan barra: un 0/1 no aporta nada
+              !a.unlocked&&a.progress.t>1&&h('div',null,
                 h('div',{className:'ach-prog-wrap'},
                   h('div',{className:'ach-prog',style:{width:pct+'%',background:a.color}})
                 ),
                 h('div',{className:'ach-prog-label'},a.progress.v.toLocaleString('es-ES')+' / '+a.progress.t.toLocaleString('es-ES'))
               ),
+              a.unlocked&&a.date&&h('div',{className:'ach-date'},
+                'Conseguido el '+new Date(a.date).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})),
               a.unlocked&&h('div',{className:'ach-badge'},'✅')
             );
           })
@@ -1246,28 +1363,23 @@ function ProfileBanner({profile,weightLog,onGoToProfile}){
     h('button',{className:'btn btns btnsm',onClick:onGoToProfile},'Ir a Perfil')
   );
   return h('div',{className:'profile-bar'},
-    h('span',null,'Peso actual: ',h('strong',{style:{color:'var(--t1)'}},currentWeight+' kg'),
-      profile.sex?' · '+profile.sex:'',
-      profile.dob?' · '+calcAge(profile.dob)+' años':''),
+    h('span',null,'Peso actual: ',h('strong',{style:{color:'var(--t1)'}},currentWeight+' kg')),
     h('button',{className:'btn btns btnsm',onClick:onGoToProfile},'Perfil')
   );
 }
 
 // ---- Helpers for profile ----
-function calcAge(dob){
-  if(!dob)return '';
-  const b=new Date(dob), now=new Date();
-  let age=now.getFullYear()-b.getFullYear();
-  if(now<new Date(now.getFullYear(),b.getMonth(),b.getDate()))age--;
-  return age;
-}
+// Sin nombre devuelve '' para que el avatar muestre el icono genérico
 function getInitials(name){
-  if(!name)return '?';
-  return name.trim().split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  if(!name||!name.trim())return '';
+  return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2);
 }
+// El perfil solo guarda el nombre: el sexo y la fecha de nacimiento de versiones anteriores
+// no se usaban en ningún cálculo y se descartan al cargar o importar
+function sanitizeProfile(p){return {name:typeof p?.name==='string'?p.name:''};}
 
 // ---- Profile Tab ----
-function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessions,backupAgeDays,needsBackup,onOpenBackup}){
+function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessions,library,backupAgeDays,needsBackup,onOpenBackup}){
   const [editing,setEditing]=useState(false);
   const [draft,setDraft]=useState(profile);
   const [newWeight,setNewWeight]=useState('');
@@ -1286,8 +1398,7 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
   const chartData=useMemo(()=>sortedLog.map(e=>e.weight),[sortedLog]);
 
   function saveProfile(){
-    if(!draft.sex){alert('Selecciona el sexo');return;}
-    onChange(draft);setEditing(false);
+    onChange(sanitizeProfile({name:(draft.name||'').trim()}));setEditing(false);
   }
   function addWeight(){
     const w=parseFloat(newWeight);
@@ -1298,8 +1409,7 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
     setNewWeightDate(todayISO);
   }
 
-  const age=calcAge(profile.dob);
-  const initials=getInitials(profile.name||profile.sex||'');
+  const initials=getInitials(profile.name);
 
   return h('div',{className:'content'},
     // Hero card
@@ -1308,7 +1418,7 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
       h('div',{className:'profile-hero-info'},
         h('div',{className:'profile-hero-name'},profile.name||'Mi perfil'),
         h('div',{className:'profile-hero-meta'},
-          [profile.sex, age?age+' años':null, currentWeight?currentWeight+' kg':null].filter(Boolean).join(' · ')||'Completa tu perfil'
+          currentWeight?currentWeight+' kg':'Añade tu peso para estimar calorías'
         )
       ),
       h('div',{className:'profile-hero-edit'},
@@ -1323,13 +1433,6 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
     editing&&h('div',{className:'card'},
       h('div',{className:'cardtitle'},'Editar perfil'),
       h('div',{className:'fg'},h('label',null,'Nombre'),h('input',{value:draft.name||'',onChange:e=>setDraft({...draft,name:e.target.value}),placeholder:'Tu nombre'})),
-      h('div',{className:'grid2'},
-        h('div',{className:'fg'},h('label',null,'Sexo'),h('select',{value:draft.sex||'',onChange:e=>setDraft({...draft,sex:e.target.value})},
-          h('option',{value:''},'— Seleccionar —'),h('option',{value:'Hombre'},'Hombre'),h('option',{value:'Mujer'},'Mujer')
-        )),
-        h('div',{className:'fg'},h('label',null,'Fecha de nacimiento'),h('input',{type:'date',value:draft.dob||'',onChange:e=>setDraft({...draft,dob:e.target.value}),max:todayISO}))
-      ),
-      h('div',{className:'method-note'},'La edad se calcula automáticamente a partir de la fecha de nacimiento.'),
       h('button',{className:'btn btnp',style:{width:'100%',marginTop:8},onClick:saveProfile},'Guardar perfil')
     ),
 
@@ -1398,7 +1501,7 @@ function ProfileTab({profile,onChange,weightLog,onAddWeight,onRemoveWeight,sessi
     // Achievements
     h('div',{className:'card'},
       h('div',{className:'cardtitle'},'🏅 Logros'),
-      h(AchievementsSection,{sessions})
+      h(AchievementsSection,{sessions,library})
     )
   );
 }
@@ -1600,7 +1703,8 @@ const MUSCLE_PALETTE={
   Core:'#72243E',Glúteos:'#3B6D11',Cardio:'#185FA5'
 };
 
-function SessionCompleteModal({session,onClose}){
+// newAchievements: logros que se han desbloqueado con esta sesión
+function SessionCompleteModal({session,newAchievements=[],onClose}){
   const [visible,setVisible]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setVisible(true),30);return()=>clearTimeout(t);},[]);
 
@@ -1670,6 +1774,13 @@ function SessionCompleteModal({session,onClose}){
         ),
 
         // Body map
+        newAchievements.length>0&&h('div',{className:'sc-ach'},
+          h('div',{className:'sc-ach-title'},newAchievements.length===1?'🏅 Logro desbloqueado':'🏅 '+newAchievements.length+' logros desbloqueados'),
+          newAchievements.map(a=>h('div',{key:a.id,className:'sc-ach-row'},
+            h('span',{className:'sc-ach-icon'},a.icon),
+            h('div',null,h('div',{className:'sc-ach-name'},a.name),h('div',{className:'sc-ach-desc'},a.desc))
+          ))
+        ),
         h('div',{className:'sc-map-title'},'Músculos trabajados'),
         h(BodyMap,{exercises:session.exercises}),
 
@@ -1844,6 +1955,7 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
   const [newExName,setNewExName]=useState('');
   const [completedSession,setCompletedSession]=useState(null);
   const [showRoutineName,setShowRoutineName]=useState(false);
+  const [newAchievements,setNewAchievements]=useState([]);
   // Descanso en curso: {endAt, total} o null. La duración por defecto se recuerda entre sesiones
   const [rest,setRest]=useState(null);
   const [restSecs,setRestSecs]=useState(()=>{const v=loadState(REST_KEY,90);return REST_OPTIONS.includes(v)?v:90;});
@@ -1889,9 +2001,9 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
   // Notify App whether there's an active session
   useEffect(()=>{onActiveSessionChange&&onActiveSessionChange(exercises.length>0);},[exercises.length]);
 
-  // Start timer on first exercise / reset when emptied
+  // Arranca el cronómetro al añadir el primer ejercicio (o varios de golpe con una rutina) y lo reinicia al vaciar
   useEffect(()=>{
-    if(exercises.length===1&&!timerStart){
+    if(exercises.length>0&&!timerStart){
       const start=Date.now();
       setTimerStart(start);setLastActivity(start);setPausedAt(null);
     }
@@ -1907,9 +2019,12 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
     const now=Date.now();
     setLastActivity(now);
     setDraftBanner(null); // al retomar la sesión el borrador ya está recuperado
-    if(pausedAt){
-      // Resume: shift timerStart forward by paused duration so elapsed continues smoothly
-      setTimerStart(ts=>ts+(now-pausedAt));
+    // Si la pausa por inactividad no llegó a detectarse (iOS congela los timers en segundo plano),
+    // se aplica ahora: la sesión se considera pausada desde lastActivity + 15 min
+    const pauseStart=pausedAt||(timerStart&&now-lastActivity>INACTIVITY_MS?lastActivity+INACTIVITY_MS:null);
+    if(pauseStart){
+      // Reanudar: se desplaza el inicio lo que duró la pausa para que el tiempo siga donde estaba
+      setTimerStart(ts=>ts+(now-pauseStart));
       setPausedAt(null);
     }
   },[exercises]);
@@ -1948,20 +2063,29 @@ function WorkoutTab({sessions,library,routines,onSave,profile,weightLog,onGoToPr
     const cleaned=cleanExercises(exercises);
     if(!cleaned.length){alert('No hay ninguna serie con datos. Rellena al menos una serie antes de guardar.');return;}
     const dropped=exercises.length-cleaned.length;
-    const msg='¿Terminar y guardar la sesión?'+(dropped>0?'\n\nSe ignorará'+(dropped>1?'n ':' ')+dropped+' ejercicio'+(dropped>1?'s':'')+' sin datos.':'');
+    // Series empezadas pero incompletas (p. ej. kg sin repeticiones): se avisa en vez de perderlas en silencio
+    const halfSets=exercises.reduce((t,e)=>t+e.sets.filter(s=>(s.weight||s.reps||s.secs||s.duration||s.distance)&&!setHasData(e,s)).length,0);
+    const msg='¿Terminar y guardar la sesión?'
+      +(dropped>0?'\n\nSe ignorará'+(dropped>1?'n ':' ')+dropped+' ejercicio'+(dropped>1?'s':'')+' sin datos.':'')
+      +(halfSets>0?'\n\n'+(halfSets>1?halfSets+' series están incompletas (sin repeticiones) y no se guardarán.':'1 serie está incompleta (sin repeticiones) y no se guardará.'):'');
     if(!confirm(msg))return;
-    const realEnd=pausedAt||Date.now();
+    // Sin contar el tiempo inactivo aunque la pausa aún no se haya detectado
+    const realEnd=pausedAt||Math.min(Date.now(),lastActivity+INACTIVITY_MS);
     const durationSecs=timerStart?Math.floor((realEnd-timerStart)/1000):0;
     const session={id:Date.now(),date:new Date().toISOString(),exercises:cleaned,...sessionTotals(cleaned,currentWeight),durationSecs};
     onSave(session);
     setExercises([]);setTimerStart(null);setPausedAt(null);setRest(null);
     setDraftBanner(null);
     localStorage.removeItem(DRAFT_KEY);
+    // Logros que desbloquea esta sesión: los que se cumplen ahora y no se cumplían antes
+    const ctx=achContext(library);
+    const before=unlockedIds(sessions,ctx),after=unlockedIds([session,...sessions],ctx);
+    setNewAchievements(ACHIEVEMENTS.filter(a=>after.has(a.id)&&!before.has(a.id)));
     setCompletedSession(session);
   }
   return h('div',{className:'content'},
     showNewEx&&h(NewExerciseModal,{initialName:newExName,onSave:saveNewToLibrary,onClose:()=>setShowNewEx(false)}),
-    completedSession&&h(SessionCompleteModal,{session:completedSession,onClose:()=>setCompletedSession(null)}),
+    completedSession&&h(SessionCompleteModal,{session:completedSession,newAchievements,onClose:()=>setCompletedSession(null)}),
     showRoutineName&&h(RoutineNameModal,{onSave:saveAsRoutine,onClose:()=>setShowRoutineName(false)}),
     h('div',{className:'ptitle'},'HOY'),
     h('div',{className:'psub'},new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})),
@@ -2112,6 +2236,15 @@ function LibraryTab({library,sessions,routines,onAdd,onRemove,onEdit,onAddRoutin
   const typeLocked=!!(editOrig&&usageMap[editOrig.id]);
   const muscleOptions=!typeLocked?MUSCLES:MUSCLES.filter(m=>(m==='Cardio')===!!editOrig.isCardio);
 
+  function confirmRemove(ex){
+    const inRoutines=routines.filter(r=>r.items.includes(ex.id)).map(r=>r.name);
+    let msg='¿Eliminar "'+ex.name+'" de la biblioteca?';
+    if(usageMap[ex.id])msg+=usageMap[ex.id]===1
+      ?'\n\nLa sesión donde aparece lo conserva en el historial.'
+      :'\n\nLas '+usageMap[ex.id]+' sesiones donde aparece lo conservan en el historial.';
+    if(inRoutines.length)msg+='\n\nTambién se quitará de: '+inRoutines.join(', ')+'.';
+    if(confirm(msg))onRemove(ex.id);
+  }
   function startEdit(ex){
     setEditingEx({id:ex.id,name:ex.name,muscle:ex.muscle,isCardio:ex.isCardio,
       mode:ex.mode||'weight',variantsText:(ex.variants||[]).join('\n')});
@@ -2192,7 +2325,7 @@ function LibraryTab({library,sessions,routines,onAdd,onRemove,onEdit,onAddRoutin
                   ),
                   h('div',{style:{display:'flex',gap:6,flexShrink:0}},
                     h('button',{className:'btn btns btnsm',onClick:()=>startEdit(ex)},'Editar'),
-                    String(ex.id).startsWith('c-')&&h('button',{className:'btnd',onClick:()=>onRemove(ex.id)},'Eliminar')
+                    String(ex.id).startsWith('c-')&&h('button',{className:'btnd',onClick:()=>confirmRemove(ex)},'Eliminar')
                   )
                 ))
           )
@@ -2358,7 +2491,7 @@ function HistoryTab({sessions,library,weightLog,onDelete,onUpdate}){
               h('div',{className:'hcard-left'},
                 h('div',{className:'hcard-date'},fmtDate(s.date)),
                 h('div',{className:'hcard-meta'},
-                  strEx.length>0&&h('span',{className:'sbadge'},strEx.length+' ejercicios'),
+                  strEx.length>0&&h('span',{className:'sbadge'},strEx.length+(strEx.length===1?' ejercicio':' ejercicios')),
                   s.totalVolume>0&&h('span',{className:'sbadge'},Math.round(s.totalVolume).toLocaleString('es-ES')+' kg'),
                   bodyweightReps(s.exercises)>0&&h('span',{className:'sbadge'},bodyweightReps(s.exercises)+' reps'),
                   s.durationSecs>0&&h('span',{className:'sbadge'},'⏱ '+fmtDuration(s.durationSecs)),
@@ -2706,7 +2839,7 @@ function App(){
   const [tab,setTab]=useState('workout');
   const [sessions,setSessions]=useState(()=>migrateSessions(loadState('il_sessions',[])));
   const [library,setLibrary]=useState(()=>migrateLibrary(loadState('il_library',DEFAULT_LIBRARY)));
-  const [profile,setProfile]=useState(()=>loadState('il_profile',{name:'',sex:'',dob:''}));
+  const [profile,setProfile]=useState(()=>sanitizeProfile(loadState('il_profile',{})));
   const [weightLog,setWeightLog]=useState(()=>repairWeightLog(loadState('il_weightlog',[])));
   // Sin clave guardada (primera vez con rutinas) se cargan las de calistenia por defecto
   const [routines,setRoutines]=useState(()=>sanitizeRoutines(loadState('il_routines',DEFAULT_ROUTINES)));
@@ -2726,7 +2859,11 @@ function App(){
   function deleteSession(id){setSessions(prev=>prev.filter(s=>s.id!==id));}
   function updateSession(updated){setSessions(prev=>prev.map(s=>s.id===updated.id?updated:s));}
   function addToLibrary(ex){setLibrary(prev=>[...prev,ex]);}
-  function removeFromLibrary(id){setLibrary(prev=>prev.filter(e=>e.id!==id));}
+  // Al borrar un ejercicio se quita también de las rutinas (las sesiones guardadas lo conservan)
+  function removeFromLibrary(id){
+    setLibrary(prev=>prev.filter(e=>e.id!==id));
+    setRoutines(prev=>prev.map(r=>r.items.includes(id)?{...r,items:r.items.filter(x=>x!==id)}:r));
+  }
   function addRoutine(r){setRoutines(prev=>[...prev,r]);}
   function updateRoutine(r){setRoutines(prev=>prev.map(x=>x.id===r.id?r:x));}
   function removeRoutine(id){setRoutines(prev=>prev.filter(x=>x.id!==id));}
@@ -2742,7 +2879,7 @@ function App(){
     setLibrary(migrateLibrary(data.library));
     // Las copias anteriores a las rutinas no las traen: se conservan las actuales
     if(data.routines)setRoutines(sanitizeRoutines(data.routines));
-    if(data.profile)setProfile(data.profile);
+    if(data.profile)setProfile(sanitizeProfile(data.profile));
     if(data.weightLog)setWeightLog(repairWeightLog(data.weightLog));
   }
 
@@ -2796,7 +2933,7 @@ function App(){
     h('div',{style:{display:tab==='stats'?'block':'none'}},
       h(StatsTab,{sessions,library,day})),
     h('div',{style:{display:tab==='profile'?'block':'none'}},
-      h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions,
+      h(ProfileTab,{profile,onChange:setProfile,weightLog,onAddWeight:addWeight,onRemoveWeight:removeWeight,sessions,library,
         backupAgeDays,needsBackup,onOpenBackup:()=>{setTab('backup');window.scrollTo(0,0);}})),
     h('div',{style:{display:tab==='backup'?'block':'none'}},
       h(BackupTab,{sessions,library,profile,weightLog,routines,onRestore:restoreBackup,onExported:markExported,
